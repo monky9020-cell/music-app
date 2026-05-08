@@ -46,22 +46,22 @@ class URLResolver:
     def resolve(self, raw: str, artist_hint: str) -> tuple[str, str]:
         if not YT_URL.search(raw):
             return raw, artist_hint
-        opts = {"quiet": True, "no_warnings": True,
-                "skip_download": True, "socket_timeout": 15}
+        # noembed.com — gratis, sin key, funciona en cualquier servidor
         try:
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                info = ydl.extract_info(raw, download=False)
-            title   = info.get("title") or raw
-            channel = info.get("channel") or info.get("uploader") or ""
-            channel = re.sub(r"\s*-\s*Topic$", "", channel).strip()
-            artist  = self._artist_from_title(title) or channel or artist_hint
+            resp = req.get(
+                f"https://noembed.com/embed?url={raw}",
+                timeout=8
+            )
+            data = resp.json()
+            title  = data.get("title") or raw
+            artist = self._artist_from_title(title) or artist_hint
             return title, artist
         except Exception:
             return raw, artist_hint
 
     def _artist_from_title(self, title: str) -> str:
         clean = re.sub(
-            r"\s*[\(\[]?(official\s*(music\s*)?video|lyric\s*video|audio|hd|hq|mv)[\)\]]?",
+            r"\s*[\(\[]?(official\s*(music\s*)?video|lyric\s*video|audio|hd|hq|mv|lyrics)[\)\]]?",
             "", title, flags=re.IGNORECASE
         ).strip()
         for sep in [" - ", " \u2013 ", " : ", " | "]:
@@ -397,12 +397,8 @@ def search():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-import os
-
 if __name__ == "__main__":
     print("=" * 50)
-    print("  Music Recommender — iniciando servidor...")
+    print("  Music Recommender — abriendo en http://localhost:5000")
     print("=" * 50)
-
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(debug=False, port=5000)
