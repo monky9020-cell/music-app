@@ -401,6 +401,14 @@ def recommend(raw_input: str, artist: str, n: int = 5) -> dict:
 def index():
     return render_template("index.html")
 
+@app.route("/privacy")
+def privacy():
+    return render_template("privacy.html")
+
+@app.route("/terms")
+def terms():
+    return render_template("terms.html")
+
 @app.route("/daily", methods=["POST"])
 def daily():
     """Devuelve la canción más popular de un artista para la canción del día."""
