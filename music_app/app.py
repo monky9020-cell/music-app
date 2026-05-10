@@ -144,19 +144,36 @@ class SmartQueryGenerator:
         self.lastfm = LastFMClient()
 
     def generate(self, title: str, artist: str) -> list[tuple[str, str]]:
+        # Pide 12 artistas similares para tener variedad
         similar = self.lastfm.get_similar_artists(artist, limit=12)
         if not similar:
             return self._fallback(title, artist)
 
+        # Mezcla aleatoriamente los 12 artistas
+        # Pero da más peso a los más similares — toma 4 del top 6 y 2 del resto
+        top6    = similar[:6]
+        rest    = similar[6:]
+        random.shuffle(top6)
+        random.shuffle(rest)
+        chosen  = top6[:4] + rest[:2]
+        random.shuffle(chosen)
+
         queries = []
-        for sim in similar[:6]:
-            tracks = self.lastfm.get_top_tracks(sim.name, limit=3)
+        for sim in chosen:
+            # Pide top 5 canciones y elige una al azar
+            tracks = self.lastfm.get_top_tracks(sim.name, limit=5)
             if tracks:
-                queries.append((f"{sim.name} {tracks[0]} official", sim.name))
-                if len(tracks) > 1:
-                    queries.append((f"{sim.name} {tracks[1]} official", sim.name))
+                # Elige aleatoriamente entre las top 5
+                track = random.choice(tracks)
+                queries.append((f"{sim.name} {track} official", sim.name))
+                # Segunda canción diferente si hay más
+                remaining = [t for t in tracks if t != track]
+                if remaining:
+                    track2 = random.choice(remaining)
+                    queries.append((f"{sim.name} {track2} official", sim.name))
             else:
                 queries.append((f"{sim.name} official music video", sim.name))
+
         return queries[:10]
 
     def _fallback(self, title: str, artist: str) -> list[tuple[str, str]]:
@@ -383,6 +400,28 @@ def recommend(raw_input: str, artist: str, n: int = 5) -> dict:
 @app.route("/")
 def index():
     return render_template("index.html")
+
+@app.route("/daily", methods=["POST"])
+def daily():
+    """Devuelve la canción más popular de un artista para la canción del día."""
+    data   = request.get_json()
+    artist = data.get("artist", "").strip()
+    if not artist:
+        return jsonify({"error": "Artista requerido"}), 400
+    try:
+        tracks = query_gen.lastfm.get_top_tracks(artist, limit=5)
+        if not tracks:
+            return jsonify({"error": "Sin resultados"}), 404
+        track = random.choice(tracks)
+        # Busca el video en YouTube
+        results = fetcher._fetch_one(f"{artist} {track} official", artist)
+        ranked  = scorer.filter_and_score(results, "")
+        if ranked:
+            r = ranked[0]
+            return jsonify({"title": r.title, "url": r.url})
+        return jsonify({"error": "Sin resultados"}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/search", methods=["POST"])
 def search():
