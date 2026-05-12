@@ -397,6 +397,65 @@ def recommend(raw_input: str, artist: str, n: int = 5) -> dict:
 # RUTAS FLASK
 # ══════════════════════════════════════════════════════════════════
 
+STYLES = {
+    "heavy": {
+        "label": "Guitarras pesadas",
+        "icon": "🎸",
+        "seeds": ["Deftones", "Tool", "Queens of the Stone Age", "Soundgarden"]
+    },
+    "atmospheric": {
+        "label": "Atmosférico",
+        "icon": "🌊",
+        "seeds": ["Slowdive", "Beach House", "Cocteau Twins", "Grouper"]
+    },
+    "electronic": {
+        "label": "Electrónico",
+        "icon": "🤖",
+        "seeds": ["Burial", "Four Tet", "Massive Attack", "Boards of Canada"]
+    },
+    "rhythmic": {
+        "label": "Con ritmo",
+        "icon": "🥁",
+        "seeds": ["Rage Against the Machine", "Prodigy", "Daft Punk"]
+    },
+    "melodic": {
+        "label": "Melódico",
+        "icon": "🎹",
+        "seeds": ["Bon Iver", "Nils Frahm", "Sigur Ros", "Olafur Arnalds"]
+    },
+    "dark": {
+        "label": "Oscuro",
+        "icon": "🌙",
+        "seeds": ["Nine Inch Nails", "Portishead", "Crystal Castles", "The Cure"]
+    },
+    "bright": {
+        "label": "Luminoso",
+        "icon": "☀️",
+        "seeds": ["MGMT", "Vampire Weekend", "Phoenix", "Two Door Cinema Club"]
+    },
+    "urban": {
+        "label": "Urbano",
+        "icon": "🎤",
+        "seeds": ["Bad Bunny", "Kendrick Lamar", "Tyler the Creator", "Feid"]
+    },
+}
+
+@app.route("/explore", methods=["POST"])
+def explore():
+    data  = request.get_json()
+    style = data.get("style", "")
+    if style not in STYLES:
+        return jsonify({"error": "Estilo no válido"}), 400
+    try:
+        cfg    = STYLES[style]
+        artist = random.choice(cfg["seeds"])
+        result = recommend(artist, artist)
+        result["style_label"] = cfg["label"]
+        result["style_icon"]  = cfg["icon"]
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route("/ads.txt")
 def ads_txt():
     return "google.com, pub-7088507477090236, DIRECT, f08c47fec0942fa0", 200, {"Content-Type": "text/plain"}
