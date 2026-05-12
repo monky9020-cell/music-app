@@ -22,7 +22,16 @@
   .tagline{font-size:12px;color:#555;margin-bottom:28px;padding-left:48px}
   .tagline b{color:#1db954;font-weight:500}
 
-  /* Search form */
+  /* Explorar por estilo */
+  .explore-section{margin-bottom:28px}
+  .explore-label{font-size:11px;color:#737373;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;display:block}
+  .explore-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .explore-btn{background:#111;border:1px solid #1e1e1e;border-radius:12px;padding:12px 8px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;transition:all .15s}
+  .explore-btn:hover{border-color:#1db954;background:#161616}
+  .explore-btn.active{border-color:#1db954;background:#0d2818}
+  .explore-btn span:first-child{font-size:22px}
+  .explore-btn span:last-child{font-size:11px;color:#a0a0a0;text-align:center;line-height:1.3}
+  @media(max-width:480px){.explore-grid{grid-template-columns:repeat(2,1fr)}}
   .form-card{background:#111;border:1px solid #222;border-radius:16px;padding:24px;margin-bottom:28px}
   .form-label{font-size:11px;color:#737373;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;display:block}
   .input-row{display:flex;gap:12px;margin-bottom:16px}
@@ -147,6 +156,21 @@
     <div class="daily-actions">
       <button class="daily-btn primary" onclick="dailySearch()">Buscar similares</button>
       <button class="daily-btn" onclick="openYT(dailySongUrl)">Abrir en YouTube</button>
+    </div>
+  </div>
+
+  <!-- Explorar por estilo -->
+  <div class="explore-section">
+    <span class="explore-label">Explorar por estilo</span>
+    <div class="explore-grid">
+      <button class="explore-btn" onclick="exploreStyle('heavy')"><span>🎸</span><span>Guitarras pesadas</span></button>
+      <button class="explore-btn" onclick="exploreStyle('atmospheric')"><span>🌊</span><span>Atmosférico</span></button>
+      <button class="explore-btn" onclick="exploreStyle('electronic')"><span>🤖</span><span>Electrónico</span></button>
+      <button class="explore-btn" onclick="exploreStyle('rhythmic')"><span>🥁</span><span>Con ritmo</span></button>
+      <button class="explore-btn" onclick="exploreStyle('melodic')"><span>🎹</span><span>Melódico</span></button>
+      <button class="explore-btn" onclick="exploreStyle('dark')"><span>🌙</span><span>Oscuro</span></button>
+      <button class="explore-btn" onclick="exploreStyle('bright')"><span>☀️</span><span>Luminoso</span></button>
+      <button class="explore-btn" onclick="exploreStyle('urban')"><span>🎤</span><span>Urbano</span></button>
     </div>
   </div>
 
@@ -476,6 +500,38 @@ function renderResults(data) {
   })
 
   section.style.display = 'block'
+}
+
+async function exploreStyle(style) {
+  // Resalta el botón activo
+  document.querySelectorAll('.explore-btn').forEach(b => b.classList.remove('active'))
+  event.currentTarget.classList.add('active')
+
+  setError('')
+  setLoading(true)
+  document.getElementById('results-section').style.display = 'none'
+  document.getElementById('empty').className = 'empty'
+  startProgress()
+
+  try {
+    const resp = await fetch('/explore', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({style})
+    })
+    const data = await resp.json()
+    stopProgress()
+    setLoading(false)
+    if (data.error) { setError(data.error); return }
+    searchHistory.push({query: data.style_label, artist: data.artist})
+    updateBreadcrumb()
+    saveToHistory(data.artist)
+    renderResults(data)
+  } catch(e) {
+    stopProgress()
+    setLoading(false)
+    setError('Error de conexión.')
+  }
 }
 
 function radioFrom(idx) {
