@@ -42,11 +42,62 @@ YT_URL = re.compile(
     r"(https?://)?(www\.)?(youtube\.com/watch\?v=|youtu\.be/)([A-Za-z0-9_-]{11})"
 )
 
+class MusicBrainz:
+    """
+    Detecta artista desde título de canción usando MusicBrainz.
+    Gratis, sin API key, funciona en cualquier servidor.
+    """
+    BASE = "https://musicbrainz.org/ws/2"
+    HEADERS = {"User-Agent": "SonarApp/1.0 (music recommender)"}
+
+    def find_artist(self, title: str) -> str:
+        """Dado un título de canción, devuelve el artista más probable."""
+        # Limpia el título antes de buscar
+        clean = re.sub(
+            r"\s*[\(\[]?(official|lyrics?|video|hd|hq|audio|mv|live|remix)[\)\]]?",
+            "", title, flags=re.IGNORECASE
+        ).strip()
+        # Quita el artista si ya viene en el título (formato "Artista - Canción")
+        song = clean
+        for sep in [" - ", " – ", " | ", " : "]:
+            if sep in clean:
+                parts = clean.split(sep)
+                song = parts[1].strip() if len(parts) > 1 else clean
+                break
+        try:
+            resp = req.get(
+                f"{self.BASE}/recording",
+                params={
+                    "query": f'recording:"{song}"',
+                    "limit": 3,
+                    "fmt":   "json",
+                },
+                headers=self.HEADERS,
+                timeout=8,
+            )
+            data = resp.json()
+            recordings = data.get("recordings", [])
+            if recordings:
+                credits = recordings[0].get("artist-credit", [])
+                if credits:
+                    return credits[0].get("artist", {}).get("name", "")
+        except Exception:
+            pass
+        return ""
+
+
 class URLResolver:
+    def __init__(self):
+        self.mb = MusicBrainz()
+
     def resolve(self, raw: str, artist_hint: str) -> tuple[str, str]:
         if not YT_URL.search(raw):
+            # No es URL — intenta detectar artista del texto con MusicBrainz
+            if not artist_hint:
+                artist_hint = self.mb.find_artist(raw) or artist_hint
             return raw, artist_hint
-        # noembed.com — gratis, sin key, funciona en cualquier servidor
+
+        # Es URL — usa noembed para obtener el título
         try:
             resp = req.get(
                 f"https://noembed.com/embed?url={raw}",
@@ -54,7 +105,14 @@ class URLResolver:
             )
             data = resp.json()
             title  = data.get("title") or raw
-            artist = self._artist_from_title(title) or artist_hint
+            artist = self._artist_from_title(title)
+
+            # Si no detectamos artista del título, usamos MusicBrainz
+            if not artist:
+                artist = self.mb.find_artist(title)
+
+            # Último fallback: hint del usuario
+            artist = artist or artist_hint
             return title, artist
         except Exception:
             return raw, artist_hint
@@ -305,7 +363,10 @@ class FilterScorer:
                 continue
             if self._is_original(v.channel, original_artist):
                 continue
-            if vid_id in seen_ids or title_key in seen_titles:
+            if vid_id in seen_ids:
+                continue
+            # Verifica duplicados por título normalizado
+            if title_key and title_key in seen_titles:
                 continue
 
             ch_key = self._norm(v.channel)
@@ -313,7 +374,8 @@ class FilterScorer:
                 continue
 
             seen_ids.add(vid_id)
-            seen_titles.add(title_key)
+            if title_key:
+                seen_titles.add(title_key)
             artist_count[ch_key] += 1
             v.score = self._score(v)
             filtered.append(v)
