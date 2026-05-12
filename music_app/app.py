@@ -397,6 +397,10 @@ def recommend(raw_input: str, artist: str, n: int = 5) -> dict:
 # RUTAS FLASK
 # ══════════════════════════════════════════════════════════════════
 
+@app.route("/ads.txt")
+def ads_txt():
+    return "google.com, pub-7088507477090236, DIRECT, f08c47fec0942fa0", 200, {"Content-Type": "text/plain"}
+
 @app.route("/")
 def index():
     return render_template("index.html")
