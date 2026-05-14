@@ -603,6 +603,47 @@ def explore():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route("/solo", methods=["POST"])
+def solo():
+    """Busca canciones del mismo artista — sin recomendaciones externas."""
+    data   = request.get_json()
+    artist = data.get("artist", "").strip()
+    if not artist:
+        return jsonify({"error": "Artista requerido"}), 400
+    try:
+        tracks = query_gen.lastfm.get_top_tracks(artist, limit=10)
+        queries = []
+        if tracks:
+            random.shuffle(tracks)
+            for track in tracks[:8]:
+                queries.append((f"{artist} {track} official", artist))
+        else:
+            queries.append((f"{artist} official music video", artist))
+
+        raw    = fetcher.fetch_many(queries)
+        ranked = scorer.filter_and_score(raw, "")
+        top    = ranked[:10]
+
+        def fmt(r):
+            return {
+                "title":         r.title,
+                "url":           r.url,
+                "duration":      r.duration_fmt(),
+                "channel":       r.channel,
+                "target_artist": artist,
+                "score":         r.score,
+            }
+
+        return jsonify({
+            "title":     artist,
+            "artist":    artist,
+            "top":       [fmt(r) for r in top[:5]],
+            "secondary": [fmt(r) for r in top[5:]],
+            "results":   [fmt(r) for r in top],
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route("/ads.txt")
 def ads_txt():
     return "google.com, pub-7088507477090236, DIRECT, f08c47fec0942fa0", 200, {"Content-Type": "text/plain"}
