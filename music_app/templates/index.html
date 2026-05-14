@@ -341,9 +341,6 @@ async function doSoloSearch() {
   const artist = document.getElementById('artist').value.trim()
   if (!query && !artist) { setError('Ingresa una canción o artista'); return }
 
-  // Usa el artista del campo, o extrae del query si es un nombre
-  const target = artist || query
-
   setError('')
   setLoading(true)
   document.getElementById('results-section').style.display = 'none'
@@ -351,18 +348,28 @@ async function doSoloSearch() {
   startProgress()
 
   try {
+    // Paso 1: resolver el artista real (por si es una URL)
+    const resolveResp = await fetch('/resolve', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({query, artist})
+    })
+    const resolved = await resolveResp.json()
+    const targetArtist = resolved.artist || artist || query
+
+    // Paso 2: buscar solo canciones de ese artista
     const resp = await fetch('/solo', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({artist: target})
+      body: JSON.stringify({artist: targetArtist})
     })
     const data = await resp.json()
     stopProgress()
     setLoading(false)
     if (data.error) { setError(data.error); return }
-    searchHistory.push({query: target, artist: target})
+    searchHistory.push({query: targetArtist, artist: targetArtist})
     updateBreadcrumb()
-    saveToHistory(target)
+    saveToHistory(targetArtist)
     renderResults(data)
   } catch(e) {
     stopProgress()
