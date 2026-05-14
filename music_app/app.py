@@ -644,6 +644,18 @@ def solo():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route("/resolve", methods=["POST"])
+def resolve():
+    """Solo detecta el artista de una URL o texto — sin buscar recomendaciones."""
+    data   = request.get_json()
+    query  = data.get("query", "").strip()
+    artist = data.get("artist", "").strip()
+    try:
+        title, detected_artist = resolver.resolve(query, artist)
+        return jsonify({"title": title, "artist": detected_artist})
+    except Exception as e:
+        return jsonify({"artist": artist or query}), 200
+
 @app.route("/ads.txt")
 def ads_txt():
     return "google.com, pub-7088507477090236, DIRECT, f08c47fec0942fa0", 200, {"Content-Type": "text/plain"}
