@@ -192,6 +192,55 @@ class LastFMClient:
         except Exception:
             return []
 
+    def get_similar_tracks(self, artist: str, track: str,
+                           limit: int = 10) -> list[tuple[str, str]]:
+        """
+        Devuelve canciones similares a una canción específica.
+        Retorna lista de (artista, titulo).
+        """
+        params = {
+            "method":  "track.getSimilar",
+            "artist":  artist,
+            "track":   track,
+            "api_key": LASTFM_API_KEY,
+            "format":  "json",
+            "limit":   limit,
+        }
+        try:
+            resp = req.get(LASTFM_URL, params=params, timeout=10)
+            resp.raise_for_status()
+            data = resp.json()
+            if "error" in data:
+                return []
+            tracks = data.get("similartracks", {}).get("track", [])
+            result = []
+            for t in tracks:
+                name   = t.get("name", "")
+                artist_name = t.get("artist", {}).get("name", "")
+                if name and artist_name:
+                    result.append((artist_name, name))
+            return result
+        except Exception:
+            return []
+
+    def get_track_tags(self, artist: str, track: str) -> list[str]:
+        """Obtiene tags de una canción específica — romantic, chill, dark, etc."""
+        params = {
+            "method":  "track.getInfo",
+            "artist":  artist,
+            "track":   track,
+            "api_key": LASTFM_API_KEY,
+            "format":  "json",
+        }
+        try:
+            resp = req.get(LASTFM_URL, params=params, timeout=10)
+            resp.raise_for_status()
+            data = resp.json()
+            tags = data.get("track", {}).get("toptags", {}).get("tag", [])
+            return [t["name"].lower() for t in tags if t.get("name")]
+        except Exception:
+            return []
+
 
 # ══════════════════════════════════════════════════════════════════
 # QUERY GENERATOR
@@ -202,37 +251,64 @@ class SmartQueryGenerator:
         self.lastfm = LastFMClient()
 
     def generate(self, title: str, artist: str) -> list[tuple[str, str]]:
-        # Pide 12 artistas similares para tener variedad
-        similar = self.lastfm.get_similar_artists(artist, limit=12)
-        if not similar:
+        queries = []
+
+        # Extrae título limpio de la canción (sin artista)
+        song_title = self._extract_song_title(title, artist)
+
+        # PASO 1: track.getSimilar — canciones similares a esta canción específica
+        if song_title:
+            similar_tracks = self.lastfm.get_similar_tracks(artist, song_title, limit=8)
+            if similar_tracks:
+                # Mezcla para variedad
+                random.shuffle(similar_tracks)
+                for sim_artist, sim_track in similar_tracks[:6]:
+                    queries.append((f"{sim_artist} {sim_track} official", sim_artist))
+                # Si hay suficientes resultados, retorna directo
+                if len(queries) >= 5:
+                    return queries[:10]
+
+        # PASO 2: fallback a artist.getSimilar si track.getSimilar no dio resultados
+        similar_artists = self.lastfm.get_similar_artists(artist, limit=12)
+        if similar_artists:
+            top6 = similar_artists[:6]
+            rest = similar_artists[6:]
+            random.shuffle(top6)
+            random.shuffle(rest)
+            chosen = top6[:4] + rest[:2]
+            random.shuffle(chosen)
+
+            for sim in chosen:
+                tracks = self.lastfm.get_top_tracks(sim.name, limit=5)
+                if tracks:
+                    track = random.choice(tracks)
+                    queries.append((f"{sim.name} {track} official", sim.name))
+                    remaining = [t for t in tracks if t != track]
+                    if remaining:
+                        queries.append((f"{sim.name} {random.choice(remaining)} official", sim.name))
+                else:
+                    queries.append((f"{sim.name} official music video", sim.name))
+
+        # PASO 3: último fallback
+        if not queries:
             return self._fallback(title, artist)
 
-        # Mezcla aleatoriamente los 12 artistas
-        # Pero da más peso a los más similares — toma 4 del top 6 y 2 del resto
-        top6    = similar[:6]
-        rest    = similar[6:]
-        random.shuffle(top6)
-        random.shuffle(rest)
-        chosen  = top6[:4] + rest[:2]
-        random.shuffle(chosen)
-
-        queries = []
-        for sim in chosen:
-            # Pide top 5 canciones y elige una al azar
-            tracks = self.lastfm.get_top_tracks(sim.name, limit=5)
-            if tracks:
-                # Elige aleatoriamente entre las top 5
-                track = random.choice(tracks)
-                queries.append((f"{sim.name} {track} official", sim.name))
-                # Segunda canción diferente si hay más
-                remaining = [t for t in tracks if t != track]
-                if remaining:
-                    track2 = random.choice(remaining)
-                    queries.append((f"{sim.name} {track2} official", sim.name))
-            else:
-                queries.append((f"{sim.name} official music video", sim.name))
-
         return queries[:10]
+
+    def _extract_song_title(self, title: str, artist: str) -> str:
+        """Extrae solo el título de la canción sin el artista."""
+        clean = re.sub(
+            r"\s*[\(\[]?(official\s*(music\s*)?video|lyric\s*video|audio|hd|hq|mv|lyrics|live)[\)\]]?",
+            "", title, flags=re.IGNORECASE
+        ).strip()
+        for sep in [" - ", " \u2013 ", " | ", " : "]:
+            if sep in clean:
+                parts = clean.split(sep)
+                # Si la primera parte es el artista, devuelve la segunda
+                if artist.lower() in parts[0].lower():
+                    return parts[1].strip()
+                return parts[1].strip() if len(parts) > 1 else clean
+        return clean
 
     def _fallback(self, title: str, artist: str) -> list[tuple[str, str]]:
         clean = re.sub(r"https?://\S+", "", f"{title} {artist}")
@@ -411,14 +487,21 @@ class FilterScorer:
         score = 0.0
         t  = v.title.lower()
         ch = self._norm(v.channel)
+
+        # Bonus si el canal o título coincide con el artista objetivo
         if v.target_artist.lower() in ch:
             score += 3.0
         if v.target_artist.lower() in t:
             score += 1.5
+
+        # Popularidad neutra — no penaliza ni premia demasiado
         if v.view_count > 0:
             score += min(math.log10(v.view_count) / 10, 0.5)
-        if any(w in t for w in ["mix", "compilation", "top 10", "best of"]):
+
+        # Penaliza mixes y compilaciones
+        if any(w in t for w in ["mix", "compilation", "top 10", "best of", "all songs"]):
             score -= 1.5
+
         return round(score, 3)
 
 
