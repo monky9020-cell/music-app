@@ -431,27 +431,29 @@ query_gen = SmartQueryGenerator()
 fetcher   = YouTubeFetcher(max_per_query=5)
 scorer    = FilterScorer()
 
-def recommend(raw_input: str, artist: str, n: int = 5) -> dict:
+def recommend(raw_input: str, artist: str, n: int = 10) -> dict:
     title, artist = resolver.resolve(raw_input, artist)
     queries = query_gen.generate(title, artist)
     raw     = fetcher.fetch_many(queries)
     ranked  = scorer.filter_and_score(raw, artist)
     top     = ranked[:n]
 
+    def fmt(r):
+        return {
+            "title":         r.title,
+            "url":           r.url,
+            "duration":      r.duration_fmt(),
+            "channel":       r.channel,
+            "target_artist": r.target_artist,
+            "score":         r.score,
+        }
+
     return {
-        "title":   title,
-        "artist":  artist,
-        "results": [
-            {
-                "title":         r.title,
-                "url":           r.url,
-                "duration":      r.duration_fmt(),
-                "channel":       r.channel,
-                "target_artist": r.target_artist,
-                "score":         r.score,
-            }
-            for r in top
-        ]
+        "title":      title,
+        "artist":     artist,
+        "top":        [fmt(r) for r in top[:5]],      # Coincidencias
+        "secondary":  [fmt(r) for r in top[5:]],      # También te puede gustar
+        "results":    [fmt(r) for r in top],           # todos juntos para radio
     }
 
 
