@@ -24,7 +24,8 @@ try:
 except ImportError:
     raise SystemExit("Instala yt-dlp: pip install yt-dlp")
 
-app = Flask(__name__)
+import os
+app = Flask(__name__, static_folder=os.path.join(os.path.dirname(__file__), 'static'))
 
 # ══════════════════════════════════════════════════════════════════
 # CONFIGURACIÓN
