@@ -25,7 +25,13 @@ except ImportError:
     raise SystemExit("Instala yt-dlp: pip install yt-dlp")
 
 import os
-app = Flask(__name__, static_folder=os.path.join(os.path.dirname(__file__), 'static'))
+from flask import send_from_directory
+
+# Detecta automáticamente si la carpeta es 'static' o 'estática'
+_base = os.path.dirname(__file__)
+_static = os.path.join(_base, 'static') if os.path.exists(os.path.join(_base, 'static')) else os.path.join(_base, 'estática')
+
+app = Flask(__name__, static_folder=_static)
 
 # ══════════════════════════════════════════════════════════════════
 # CONFIGURACIÓN
