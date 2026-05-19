@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
 <title>Sonar — Descubre música similar</title>
+<link rel="manifest" href="/static/manifest.json">
+<link rel="apple-touch-icon" href="/static/icon-192.png">
+<meta name="theme-color" content="#1db954">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Sonar">
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7088507477090236" crossorigin="anonymous"></script>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
@@ -625,6 +631,11 @@ function radioFrom(idx) {
   document.getElementById('artist').value = r.target_artist
   window.scrollTo({top: 0, behavior: 'smooth'})
   doSearch()
+}
+
+// Registrar Service Worker para PWA
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/static/sw.js')
 }
 
 // ── Init ───────────────────────────────────────────────────
