@@ -430,7 +430,8 @@ class FilterScorer:
     MAX_PER_ARTIST = 1
 
     def filter_and_score(self, videos: list[VideoResult],
-                         original_artist: str) -> list[VideoResult]:
+                         original_artist: str,
+                         tags: list[str] = []) -> list[VideoResult]:
         seen_ids     = set()
         seen_titles  = set()
         artist_count = defaultdict(int)
@@ -460,7 +461,7 @@ class FilterScorer:
             if title_key:
                 seen_titles.add(title_key)
             artist_count[ch_key] += 1
-            v.score = self._score(v)
+            v.score = self._score(v, tags)
             filtered.append(v)
 
         return sorted(filtered, key=lambda x: x.score, reverse=True)
@@ -490,7 +491,7 @@ class FilterScorer:
         m = re.search(r"v=([A-Za-z0-9_-]{11})", url)
         return m.group(1) if m else url
 
-    def _score(self, v: VideoResult) -> float:
+    def _score(self, v: VideoResult, tags: list[str] = []) -> float:
         score = 0.0
         t  = v.title.lower()
         ch = self._norm(v.channel)
@@ -501,7 +502,12 @@ class FilterScorer:
         if v.target_artist.lower() in t:
             score += 1.5
 
-        # Popularidad neutra — no penaliza ni premia demasiado
+        # Bonus por tags de la canción original encontrados en el título
+        for tag in tags:
+            if tag in t:
+                score += 0.5
+
+        # Popularidad neutra
         if v.view_count > 0:
             score += min(math.log10(v.view_count) / 10, 0.5)
 
@@ -525,7 +531,14 @@ def recommend(raw_input: str, artist: str, n: int = 10) -> dict:
     title, artist = resolver.resolve(raw_input, artist)
     queries = query_gen.generate(title, artist)
     raw     = fetcher.fetch_many(queries)
-    ranked  = scorer.filter_and_score(raw, artist)
+
+    # Obtener tags de la canción para afinar el scorer
+    song_title = query_gen._extract_song_title(title, artist)
+    tags = []
+    if song_title:
+        tags = query_gen.lastfm.get_track_tags(artist, song_title)
+
+    ranked  = scorer.filter_and_score(raw, artist, tags)
     top     = ranked[:n]
 
     def fmt(r):
@@ -541,9 +554,10 @@ def recommend(raw_input: str, artist: str, n: int = 10) -> dict:
     return {
         "title":      title,
         "artist":     artist,
-        "top":        [fmt(r) for r in top[:5]],      # Coincidencias
-        "secondary":  [fmt(r) for r in top[5:]],      # También te puede gustar
-        "results":    [fmt(r) for r in top],           # todos juntos para radio
+        "tags":       tags[:5],
+        "top":        [fmt(r) for r in top[:5]],
+        "secondary":  [fmt(r) for r in top[5:]],
+        "results":    [fmt(r) for r in top],
     }
 
 
