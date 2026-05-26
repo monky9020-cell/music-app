@@ -103,6 +103,11 @@
   .btn-yt{background:none;border:none;color:#555;cursor:pointer;flex-shrink:0;padding:6px;border-radius:6px;display:flex;align-items:center;transition:color .15s}
   .btn-yt:hover{color:#fff}
   .btn-yt svg{width:20px;height:20px;fill:currentColor}
+  .btn-share{background:none;border:none;color:#555;cursor:pointer;flex-shrink:0;padding:6px;border-radius:6px;display:flex;align-items:center;transition:color .15s}
+  .btn-share:hover{color:#1db954}
+  .btn-share svg{width:16px;height:16px}
+  .toast{position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:#1db954;color:#000;padding:10px 20px;border-radius:50px;font-size:13px;font-weight:600;opacity:0;transition:opacity .3s;pointer-events:none;z-index:300}
+  .toast.show{opacity:1}
 
   /* Error / Empty */
   .error-box{background:#1a0a0a;border:1px solid #3a1a1a;border-radius:10px;padding:14px 16px;color:#ff6b6b;font-size:13px;margin-bottom:16px;display:none}
@@ -149,7 +154,7 @@
     </div>
     <div class="logo-title">Sonar</div><span style="font-size:13px;color:#a0a0a0;margin-left:2px">via Last.fm + YouTube</span>
   </div>
-  <div class="tagline">Descubre música que <b>realmente</b> suena similar. Sin algoritmos comerciales.</div>
+  <div class="tagline">Descubre música que <b>sea tuya de verdad</b>. Sin algoritmos comerciales.</div>
 
   <!-- Breadcrumb -->
   <div class="breadcrumb" id="breadcrumb"></div>
@@ -255,6 +260,9 @@
 <div class="ad-banner">
   <span>Publicidad — [ Google AdSense Banner ] · <a href="/privacy" style="color:#555;text-decoration:none">Privacidad</a> · <a href="/terms" style="color:#555;text-decoration:none">Términos</a> · © 2026 OCTMON</span>
 </div>
+
+<!-- Toast -->
+<div class="toast" id="toast">🔗 Link copiado</div>
 
 <script>
 // ── Estado global ──────────────────────────────────────────
@@ -577,12 +585,18 @@ function makeCard(r, globalIdx, secondary = false) {
     <span class="result-dur">${r.duration}</span>
     <button class="btn-radio" data-idx="${globalIdx}">
       <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zM6.27 17.73A8 8 0 1 1 17.73 6.27 8 8 0 0 1 6.27 17.73zm5.73-3.73a2 2 0 1 1-2-2 2 2 0 0 1 2 2zm0-5.27V7a5 5 0 0 1 5 5h-2a3 3 0 0 0-3-3zm0 2.17V9a3 3 0 0 1 3 3h-2a1 1 0 0 0-1-1z"/></svg>
-      Radio
+      Similar
+    </button>
+    <button class="btn-share" data-title="${esc(r.title)}" data-artist="${esc(r.target_artist)}" title="Compartir">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
     </button>
     <button class="btn-yt" data-url="${esc(r.url)}" title="Abrir en YouTube">
       <svg viewBox="0 0 24 24"><path d="M21.8 8s-.2-1.4-.8-2c-.8-.8-1.6-.8-2-.9C16.6 5 12 5 12 5s-4.6 0-7 .1c-.4.1-1.2.1-2 .9-.6.6-.8 2-.8 2S2 9.6 2 11.2v1.5c0 1.6.2 3.2.2 3.2s.2 1.4.8 2c.8.8 1.8.8 2.3.9C6.8 19 12 19 12 19s4.6 0 7-.2c.4-.1 1.2-.1 2-.9.6-.6.8-2 .8-2s.2-1.6.2-3.2v-1.5C22 9.6 21.8 8 21.8 8zM10 15V9l5.2 3-5.2 3z"/></svg>
     </button>
   `
+  card.querySelector('.btn-share').addEventListener('click', function() {
+    shareResult(this.dataset.title, this.dataset.artist)
+  })
   card.querySelector('.btn-radio').addEventListener('click', function() {
     radioFrom(parseInt(this.dataset.idx))
   })
@@ -624,6 +638,23 @@ async function exploreStyle(style) {
   }
 }
 
+function shareResult(title, artist) {
+  // Genera link con parámetros de búsqueda
+  const base = window.location.origin
+  const params = new URLSearchParams({q: title, a: artist})
+  const url = `${base}/?${params.toString()}`
+  
+  // Copia al portapapeles
+  navigator.clipboard.writeText(url).then(() => {
+    const toast = document.getElementById('toast')
+    toast.classList.add('show')
+    setTimeout(() => toast.classList.remove('show'), 2500)
+  }).catch(() => {
+    // Fallback si clipboard no está disponible
+    prompt('Copia este link:', url)
+  })
+}
+
 function radioFrom(idx) {
   const r = lastResults[idx]
   if (!r) return
@@ -636,6 +667,16 @@ function radioFrom(idx) {
 // Registrar Service Worker para PWA
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/static/sw.js')
+}
+
+// Auto-search si viene de link compartido
+const urlParams = new URLSearchParams(window.location.search)
+const sharedQ = urlParams.get('q')
+const sharedA = urlParams.get('a')
+if (sharedQ) {
+  document.getElementById('query').value = sharedQ
+  if (sharedA) document.getElementById('artist').value = sharedA
+  doSearch()
 }
 
 // ── Init ───────────────────────────────────────────────────
