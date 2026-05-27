@@ -33,6 +33,27 @@ _static = os.path.join(_base, 'static') if os.path.exists(os.path.join(_base, 's
 
 app = Flask(__name__, static_folder=_static)
 
+# ── Rate Limiting ─────────────────────────────────────────────────
+RATE_LIMIT     = 20   # búsquedas por IP por hora
+RATE_WINDOW    = 3600 # 1 hora en segundos
+
+def check_rate_limit(ip: str) -> bool:
+    """Retorna True si el IP puede hacer la búsqueda, False si excedió el límite."""
+    if not REDIS_URL:
+        return True  # Sin Redis no hay rate limit
+    key = f"sonar:rate:{hashlib.md5(ip.encode()).hexdigest()}"
+    try:
+        val = redis_get(key)
+        count = int(val) if val else 0
+        if count >= RATE_LIMIT:
+            return False
+        # Incrementa contador
+        new_count = count + 1
+        redis_set(key, str(new_count), RATE_WINDOW)
+        return True
+    except Exception:
+        return True  # Si falla Redis, permite la búsqueda
+
 # ══════════════════════════════════════════════════════════════════
 # CONFIGURACIÓN
 # ══════════════════════════════════════════════════════════════════
@@ -342,34 +363,73 @@ NOISE_WORDS = {
     "documentary", "biography", "story of",
 }
 
+# ── Redis Cache ────────────────────────────────────────────────────
+REDIS_URL   = os.environ.get("UPSTASH_REDIS_REST_URL", "")
+REDIS_TOKEN = os.environ.get("UPSTASH_REDIS_REST_TOKEN", "")
+CACHE_TTL   = 60 * 60 * 24  # 24 horas
+
+def redis_get(key: str):
+    """Obtiene valor de Redis. Retorna None si no existe o falla."""
+    if not REDIS_URL:
+        return None
+    try:
+        resp = req.get(
+            f"{REDIS_URL}/get/{key}",
+            headers={"Authorization": f"Bearer {REDIS_TOKEN}"},
+            timeout=3
+        )
+        data = resp.json()
+        return data.get("result")
+    except Exception:
+        return None
+
+def redis_set(key: str, value: str, ttl: int = CACHE_TTL) -> bool:
+    """Guarda valor en Redis con TTL en segundos."""
+    if not REDIS_URL:
+        return False
+    try:
+        req.post(
+            f"{REDIS_URL}/set/{key}",
+            headers={"Authorization": f"Bearer {REDIS_TOKEN}"},
+            json={"value": value, "ex": ttl},
+            timeout=3
+        )
+        return True
+    except Exception:
+        return False
+
+
 class YouTubeFetcher:
-    CACHE_FILE = Path(".yt_cache.json")
     CACHE_TTL  = 60 * 60 * 24
+    # Fallback local si Redis no está disponible
+    _local: dict = {}
 
     def __init__(self, max_per_query: int = 5):
         self.max_per_query = max_per_query
-        self._cache = self._load_cache()
-
-    def _load_cache(self) -> dict:
-        if self.CACHE_FILE.exists():
-            try:
-                data = json.loads(self.CACHE_FILE.read_text())
-                now  = time.time()
-                return {k: v for k, v in data.items()
-                        if now - v.get("ts", 0) < self.CACHE_TTL}
-            except Exception:
-                pass
-        return {}
-
-    def _save_cache(self) -> None:
-        try:
-            self.CACHE_FILE.write_text(
-                json.dumps(self._cache, ensure_ascii=False, indent=2))
-        except Exception:
-            pass
 
     def _key(self, q: str) -> str:
-        return hashlib.md5(q.encode()).hexdigest()
+        return f"sonar:yt:{hashlib.md5(q.encode()).hexdigest()}"
+
+    def _cache_get(self, key: str):
+        # Intenta Redis primero
+        val = redis_get(key)
+        if val:
+            try:
+                return json.loads(val)
+            except Exception:
+                pass
+        # Fallback local
+        entry = self._local.get(key)
+        if entry and time.time() - entry.get("ts", 0) < self.CACHE_TTL:
+            return entry.get("data")
+        return None
+
+    def _cache_set(self, key: str, data: list) -> None:
+        payload = json.dumps(data, ensure_ascii=False)
+        # Guarda en Redis
+        redis_set(key, payload, self.CACHE_TTL)
+        # Guarda local como fallback
+        self._local[key] = {"ts": time.time(), "data": data}
 
     def fetch_many(self, queries: list[tuple[str, str]]) -> list[VideoResult]:
         results = []
@@ -381,9 +441,10 @@ class YouTubeFetcher:
     def _fetch_one(self, query: str, target_artist: str,
                    retries: int = 3) -> list[VideoResult]:
         key = self._key(query)
-        if key in self._cache:
+        cached = self._cache_get(key)
+        if cached:
             return [VideoResult(**{**v, "target_artist": target_artist})
-                    for v in self._cache[key]["data"]]
+                    for v in cached]
         opts = {
             "quiet": True, "no_warnings": True,
             "extract_flat": True, "skip_download": True,
@@ -411,9 +472,7 @@ class YouTubeFetcher:
                         channel       = e.get("channel") or e.get("uploader") or "",
                         target_artist = target_artist,
                     ))
-                self._cache[key] = {"ts": time.time(),
-                                    "data": [v.__dict__ for v in videos]}
-                self._save_cache()
+                self._cache_set(key, [v.__dict__ for v in videos])
                 return videos
             except Exception as err:
                 time.sleep(2 ** attempt + random.uniform(0, 1))
@@ -717,6 +776,9 @@ def daily():
 
 @app.route("/search", methods=["POST"])
 def search():
+    ip = request.headers.get("X-Forwarded-For", request.remote_addr).split(",")[0].strip()
+    if not check_rate_limit(ip):
+        return jsonify({"error": "Demasiadas búsquedas. Espera un momento antes de continuar."}), 429
     data      = request.get_json()
     raw_input = data.get("query", "").strip()
     artist    = data.get("artist", "").strip()
