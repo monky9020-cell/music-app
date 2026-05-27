@@ -740,6 +740,101 @@ def resolve():
 def ads_txt():
     return "google.com, pub-7088507477090236, DIRECT, f08c47fec0942fa0", 200, {"Content-Type": "text/plain"}
 
+# ── Likes ─────────────────────────────────────────────────────────
+
+def _week_key(song_key: str) -> str:
+    """Genera clave Redis con número de semana actual."""
+    from datetime import date
+    week = date.today().isocalendar()[1]
+    year = date.today().year
+    return f"sonar:likes:{year}W{week:02d}:{song_key}"
+
+def _song_key(title: str, artist: str) -> str:
+    """Clave única por canción."""
+    raw = f"{title}:{artist}".lower()
+    return hashlib.md5(raw.encode()).hexdigest()[:16]
+
+@app.route("/like", methods=["POST"])
+def like():
+    data   = request.get_json()
+    title  = data.get("title", "").strip()
+    artist = data.get("target_artist", "").strip()
+    url    = data.get("url", "").strip()
+    if not title or not artist:
+        return jsonify({"error": "Datos incompletos"}), 400
+    try:
+        sk  = _song_key(title, artist)
+        key = _week_key(sk)
+        # Incrementa contador semanal
+        val = redis_get(key)
+        count = int(val) if val else 0
+        count += 1
+        redis_set(key, str(count), 60 * 60 * 24 * 8)  # 8 días TTL
+        # Guarda metadata de la canción para el top
+        meta_key = f"sonar:meta:{sk}"
+        redis_set(meta_key, json.dumps({
+            "title": title, "artist": artist, "url": url
+        }), 60 * 60 * 24 * 30)
+        return jsonify({"likes": count, "song_key": sk})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/likes/<song_key>", methods=["GET"])
+def get_likes(song_key):
+    """Obtiene el contador de likes de una canción."""
+    try:
+        key = _week_key(song_key)
+        val = redis_get(key)
+        return jsonify({"likes": int(val) if val else 0})
+    except Exception:
+        return jsonify({"likes": 0})
+
+@app.route("/trending", methods=["GET"])
+def trending():
+    """Devuelve el top 10 de canciones más likeadas esta semana."""
+    try:
+        from datetime import date
+        week = date.today().isocalendar()[1]
+        year = date.today().year
+        prefix = f"sonar:likes:{year}W{week:02d}:"
+
+        # Busca todas las claves de esta semana en Redis
+        if not REDIS_URL:
+            return jsonify({"songs": []})
+
+        resp = req.get(
+            f"{REDIS_URL}/keys/{prefix}*",
+            headers={"Authorization": f"Bearer {REDIS_TOKEN}"},
+            timeout=5
+        )
+        keys = resp.json().get("result", [])
+
+        songs = []
+        for key in keys:
+            val = redis_get(key)
+            if not val:
+                continue
+            sk = key.replace(f"{prefix}", "")
+            meta_val = redis_get(f"sonar:meta:{sk}")
+            if not meta_val:
+                continue
+            try:
+                meta = json.loads(meta_val)
+                songs.append({
+                    "title":  meta.get("title", ""),
+                    "artist": meta.get("artist", ""),
+                    "url":    meta.get("url", ""),
+                    "likes":  int(val),
+                })
+            except Exception:
+                continue
+
+        # Ordena por likes descendente
+        songs.sort(key=lambda x: x["likes"], reverse=True)
+        return jsonify({"songs": songs[:10]})
+    except Exception as e:
+        return jsonify({"songs": [], "error": str(e)})
+
 @app.route("/")
 def index():
     return render_template("index.html")
