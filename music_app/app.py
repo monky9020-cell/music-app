@@ -60,6 +60,80 @@ def check_rate_limit(ip: str) -> bool:
 
 LASTFM_API_KEY = "b32b1442f91e8c08574f62329f91c899"
 LASTFM_URL     = "https://ws.audioscrobbler.com/2.0/"
+GENIUS_TOKEN   = os.environ.get("GENIUS_API_TOKEN", "")
+GENIUS_URL     = "https://api.genius.com"
+
+
+# ══════════════════════════════════════════════════════════════════
+# GENIUS CLIENT
+# ══════════════════════════════════════════════════════════════════
+
+class GeniusClient:
+    """Busca canciones en Genius y obtiene métricas de engagement."""
+
+    def search_song(self, title: str, artist: str) -> dict:
+        """Busca una canción y retorna sus métricas."""
+        if not GENIUS_TOKEN:
+            return {}
+        try:
+            resp = req.get(
+                f"{GENIUS_URL}/search",
+                headers={"Authorization": f"Bearer {GENIUS_TOKEN}"},
+                params={"q": f"{artist} {title}"},
+                timeout=8
+            )
+            data = resp.json()
+            hits = data.get("response", {}).get("hits", [])
+            if not hits:
+                return {}
+            # Toma el primer resultado
+            song = hits[0].get("result", {})
+            return {
+                "title":            song.get("title", ""),
+                "artist":           song.get("primary_artist", {}).get("name", ""),
+                "pageviews":        song.get("stats", {}).get("pageviews", 0),
+                "annotations":      song.get("annotation_count", 0),
+                "genius_url":       song.get("url", ""),
+            }
+        except Exception:
+            return {}
+
+    def get_hidden_gems(self, genre_artists: list[str], limit: int = 5) -> list[dict]:
+        """
+        Busca joyas ocultas — canciones con alto engagement en Genius
+        pero artistas poco conocidos.
+        """
+        gems = []
+        for artist in genre_artists[:8]:
+            try:
+                resp = req.get(
+                    f"{GENIUS_URL}/search",
+                    headers={"Authorization": f"Bearer {GENIUS_TOKEN}"},
+                    params={"q": artist},
+                    timeout=8
+                )
+                data = resp.json()
+                hits = data.get("response", {}).get("hits", [])
+                for hit in hits[:3]:
+                    song = hit.get("result", {})
+                    pageviews   = song.get("stats", {}).get("pageviews", 0)
+                    annotations = song.get("annotation_count", 0)
+                    # Joya = muchas anotaciones relativas a las vistas
+                    # Alta obsesión de fans pero no mainstream
+                    if annotations >= 3 and pageviews < 500_000:
+                        gems.append({
+                            "title":      song.get("title", ""),
+                            "artist":     song.get("primary_artist", {}).get("name", ""),
+                            "pageviews":  pageviews,
+                            "annotations": annotations,
+                            "score":      annotations / max(pageviews, 1) * 100_000,
+                        })
+            except Exception:
+                continue
+
+        # Ordena por score — más obsesión relativa primero
+        gems.sort(key=lambda x: x["score"], reverse=True)
+        return gems[:limit]
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -585,6 +659,7 @@ resolver  = URLResolver()
 query_gen = SmartQueryGenerator()
 fetcher   = YouTubeFetcher(max_per_query=5)
 scorer    = FilterScorer()
+genius    = GeniusClient()
 
 def recommend(raw_input: str, artist: str, n: int = 10) -> dict:
     title, artist = resolver.resolve(raw_input, artist)
@@ -735,6 +810,71 @@ def resolve():
         return jsonify({"title": title, "artist": detected_artist})
     except Exception as e:
         return jsonify({"artist": artist or query}), 200
+
+@app.route("/gems", methods=["POST"])
+def gems():
+    """
+    Encuentra joyas ocultas basadas en el historial del usuario.
+    Usa Last.fm para artistas del género + Genius para medir obsesión real.
+    """
+    data    = request.get_json()
+    history = data.get("history", [])  # artistas del historial
+
+    if not history:
+        # Sin historial, elige género aleatorio
+        history = ["Deftones", "Mora", "Bad Bunny", "Crystal Castles"]
+
+    try:
+        # 1. Obtiene artistas similares a los del historial via Last.fm
+        similar_artists = []
+        sample = random.sample(history, min(3, len(history)))
+        for artist in sample:
+            similar = query_gen.lastfm.get_similar_artists(artist, limit=8)
+            for s in similar:
+                # Solo artistas con match medio — no los más famosos
+                if 0.1 < s.match < 0.6:
+                    similar_artists.append(s.name)
+
+        if not similar_artists:
+            similar_artists = history
+
+        # Deduplica y mezcla
+        similar_artists = list(set(similar_artists))
+        random.shuffle(similar_artists)
+
+        # 2. Busca joyas en Genius
+        gems_list = genius.get_hidden_gems(similar_artists, limit=8)
+
+        if not gems_list:
+            return jsonify({"error": "No se encontraron joyas. Intenta de nuevo."}), 404
+
+        # 3. Busca cada joya en YouTube
+        results = []
+        for gem in gems_list[:5]:
+            query   = f"{gem['artist']} {gem['title']} official"
+            videos  = fetcher._fetch_one(query, gem['artist'])
+            ranked  = scorer.filter_and_score(videos, "")
+            if ranked:
+                r = ranked[0]
+                results.append({
+                    "title":         r.title,
+                    "url":           r.url,
+                    "duration":      r.duration_fmt(),
+                    "channel":       r.channel,
+                    "target_artist": gem['artist'],
+                    "score":         r.score,
+                    "gem_score":     round(gem['score'], 2),
+                    "annotations":   gem['annotations'],
+                    "pageviews":     gem['pageviews'],
+                })
+
+        if not results:
+            return jsonify({"error": "No se encontraron joyas en YouTube."}), 404
+
+        return jsonify({"results": results})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/ads.txt")
 def ads_txt():
