@@ -116,16 +116,20 @@ class GeniusClient:
                 hits = data.get("response", {}).get("hits", [])
                 for hit in hits[:3]:
                     song = hit.get("result", {})
-                    pageviews   = song.get("stats", {}).get("pageviews", 0)
-                    annotations = song.get("annotation_count", 0)
-                    # Joya = alguna anotación y no mainstream
-                    if annotations >= 1 and pageviews < 1_000_000:
+                    pageviews   = song.get("stats", {}).get("pageviews", 0) or 0
+                    annotations = song.get("annotation_count", 0) or 0
+                    title       = song.get("title", "")
+                    artist_name = song.get("primary_artist", {}).get("name", "")
+
+                    # Joya = tiene algo de engagement pero no es mainstream
+                    # Acepta cualquier canción con pageviews razonables
+                    if title and artist_name and pageviews < 2_000_000:
                         gems.append({
-                            "title":      song.get("title", ""),
-                            "artist":     song.get("primary_artist", {}).get("name", ""),
-                            "pageviews":  pageviews,
+                            "title":       title,
+                            "artist":      artist_name,
+                            "pageviews":   pageviews,
                             "annotations": annotations,
-                            "score":      annotations / max(pageviews, 1) * 100_000,
+                            "score":       (annotations + 1) / max(pageviews, 1000) * 100_000,
                         })
             except Exception:
                 continue
