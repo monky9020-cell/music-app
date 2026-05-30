@@ -845,7 +845,9 @@ def gems():
         random.shuffle(similar_artists)
 
         # 2. Busca joyas en Genius
+        print(f"DEBUG similar_artists: {similar_artists[:5]}")
         gems_list = genius.get_hidden_gems(similar_artists, limit=8)
+        print(f"DEBUG gems_list: {gems_list}")
 
         if not gems_list:
             return jsonify({"error": "No se encontraron joyas. Intenta de nuevo."}), 404
