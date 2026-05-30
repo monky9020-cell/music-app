@@ -118,9 +118,8 @@ class GeniusClient:
                     song = hit.get("result", {})
                     pageviews   = song.get("stats", {}).get("pageviews", 0)
                     annotations = song.get("annotation_count", 0)
-                    # Joya = muchas anotaciones relativas a las vistas
-                    # Alta obsesión de fans pero no mainstream
-                    if annotations >= 3 and pageviews < 500_000:
+                    # Joya = alguna anotación y no mainstream
+                    if annotations >= 1 and pageviews < 1_000_000:
                         gems.append({
                             "title":      song.get("title", ""),
                             "artist":     song.get("primary_artist", {}).get("name", ""),
@@ -821,8 +820,11 @@ def gems():
     history = data.get("history", [])  # artistas del historial
 
     if not history:
-        # Sin historial, elige género aleatorio
-        history = ["Deftones", "Mora", "Bad Bunny", "Crystal Castles"]
+        # Sin historial, mezcla de géneros
+        history = random.sample([
+            "Bad Bunny", "Deftones", "Crystal Castles", "Mora",
+            "Tyler the Creator", "Tame Impala", "Natanael Cano", "Portishead"
+        ], 4)
 
     try:
         # 1. Obtiene artistas similares a los del historial via Last.fm
