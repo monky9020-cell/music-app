@@ -817,51 +817,65 @@ def resolve():
 @app.route("/gems", methods=["POST"])
 def gems():
     """
-    Encuentra joyas ocultas basadas en el historial del usuario.
-    Usa Last.fm para artistas del género + Genius para medir obsesión real.
+    Encuentra hits reales usando Last.fm chart.getTopTracks.
+    Filtra por artistas similares al historial del usuario.
+    Bloquea canal Genius en resultados de YouTube.
     """
     data    = request.get_json()
-    history = data.get("history", [])  # artistas del historial
+    history = data.get("history", [])
 
     if not history:
-        # Sin historial, mezcla de géneros
         history = random.sample([
             "Bad Bunny", "Deftones", "Crystal Castles", "Mora",
             "Tyler the Creator", "Tame Impala", "Natanael Cano", "Portishead"
         ], 4)
 
     try:
-        # 1. Obtiene artistas similares a los del historial via Last.fm
-        similar_artists = []
+        # 1. Obtiene artistas similares al historial
+        similar_artists = set()
         sample = random.sample(history, min(3, len(history)))
         for artist in sample:
-            similar = query_gen.lastfm.get_similar_artists(artist, limit=8)
+            similar = query_gen.lastfm.get_similar_artists(artist, limit=10)
             for s in similar:
-                # Solo artistas con match medio — no los más famosos
-                if 0.1 < s.match < 0.6:
-                    similar_artists.append(s.name)
+                if s.match < 0.7:  # no los más famosos
+                    similar_artists.add(s.name)
 
         if not similar_artists:
-            similar_artists = history
+            similar_artists = set(history)
 
-        # Deduplica y mezcla
-        similar_artists = list(set(similar_artists))
-        random.shuffle(similar_artists)
+        similar_list = list(similar_artists)
+        random.shuffle(similar_list)
 
-        # 2. Busca joyas en Genius
-        print(f"DEBUG similar_artists: {similar_artists[:5]}")
-        gems_list = genius.get_hidden_gems(similar_artists, limit=8)
-        print(f"DEBUG gems_list: {gems_list}")
+        # 2. Para cada artista similar, obtiene sus top tracks
+        candidates = []
+        for artist in similar_list[:6]:
+            tracks = query_gen.lastfm.get_top_tracks(artist, limit=5)
+            for track in tracks:
+                candidates.append((artist, track))
 
-        if not gems_list:
-            return jsonify({"error": "No se encontraron joyas. Intenta de nuevo."}), 404
+        if not candidates:
+            return jsonify({"error": "No se encontraron hits. Intenta de nuevo."}), 404
 
-        # 3. Busca cada joya en YouTube
+        random.shuffle(candidates)
+
+        # 3. Busca en YouTube — bloquea canal Genius
+        BLOCKED_CHANNELS = {"genius", "genius espanol", "genius india", "rap genius"}
         results = []
-        for gem in gems_list[:5]:
-            query   = f"{gem['artist']} {gem['title']} official"
-            videos  = fetcher._fetch_one(query, gem['artist'])
-            ranked  = scorer.filter_and_score(videos, "")
+        seen_artists = set()
+
+        for artist, track in candidates[:10]:
+            if artist.lower() in seen_artists:
+                continue
+            query  = f"{artist} {track} official"
+            videos = fetcher._fetch_one(query, artist)
+
+            # Filtra canal Genius
+            filtered = [
+                v for v in videos
+                if v.channel.lower() not in BLOCKED_CHANNELS
+                and "genius" not in v.channel.lower()
+            ]
+            ranked = scorer.filter_and_score(filtered, "")
             if ranked:
                 r = ranked[0]
                 results.append({
@@ -869,15 +883,16 @@ def gems():
                     "url":           r.url,
                     "duration":      r.duration_fmt(),
                     "channel":       r.channel,
-                    "target_artist": gem['artist'],
+                    "target_artist": artist,
                     "score":         r.score,
-                    "gem_score":     round(gem['score'], 2),
-                    "annotations":   gem['annotations'],
-                    "pageviews":     gem['pageviews'],
                 })
+                seen_artists.add(artist.lower())
+
+            if len(results) >= 5:
+                break
 
         if not results:
-            return jsonify({"error": "No se encontraron joyas en YouTube."}), 404
+            return jsonify({"error": "No se encontraron hits. Intenta de nuevo."}), 404
 
         return jsonify({"results": results})
 
