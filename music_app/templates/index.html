@@ -175,9 +175,9 @@
   </div>
   <div class="tagline">Descubre música que <b>sea tuya de verdad</b>. Sin algoritmos comerciales.</div>
 
-  <!-- Botón Joyas -->
+  <!-- Botón Hits -->
   <button class="btn-gems" id="btn-gems" onclick="findGems()">
-    <span>💎</span> Joyas ocultas — sorpréndeme
+    <span>🔥</span> Hits — sorpréndeme
   </button>
 
   <!-- Breadcrumb -->
@@ -664,7 +664,7 @@ function makeCard(r, globalIdx, secondary = false) {
 async function findGems() {
   const btn = document.getElementById('btn-gems')
   btn.disabled = true
-  btn.innerHTML = '<span>💎</span> <span class="dot-anim">Buscando joyas</span>'
+  btn.innerHTML = '<span>🔥</span> <span class="dot-anim">Buscando hits</span>'
 
   setError('')
   document.getElementById('results-section').style.display = 'none'
@@ -683,13 +683,13 @@ async function findGems() {
     const data = await resp.json()
     stopProgress()
     btn.disabled = false
-    btn.innerHTML = '<span>💎</span> Joyas ocultas — sorpréndeme'
+    btn.innerHTML = '<span>🔥</span> Hits — sorpréndeme'
 
     if (data.error) { setError(data.error); return }
 
     // Muestra resultados como coincidencias
     renderResults({
-      title:     'Joyas ocultas',
+      title:     'Hits del momento',
       artist:    'Sonar',
       top:       data.results.slice(0, 5),
       secondary: [],
@@ -702,7 +702,7 @@ async function findGems() {
   } catch(e) {
     stopProgress()
     btn.disabled = false
-    btn.innerHTML = '<span>💎</span> Joyas ocultas — sorpréndeme'
+    btn.innerHTML = '<span>🔥</span> Hits — sorpréndeme'
     setError('Error al buscar joyas. Intenta de nuevo.')
   }
 }
