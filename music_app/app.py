@@ -817,65 +817,60 @@ def resolve():
 @app.route("/gems", methods=["POST"])
 def gems():
     """
-    Encuentra hits reales usando Last.fm chart.getTopTracks.
-    Filtra por artistas similares al historial del usuario.
-    Bloquea canal Genius en resultados de YouTube.
+    Hits reales — chart.getTopTracks de Last.fm.
+    Canciones con millones de plays, de cualquier época.
+    Máximo 2 apariciones del mismo artista.
     """
-    data    = request.get_json()
-    history = data.get("history", [])
-
-    if not history:
-        history = random.sample([
-            "Bad Bunny", "Deftones", "Crystal Castles", "Mora",
-            "Tyler the Creator", "Tame Impala", "Natanael Cano", "Portishead"
-        ], 4)
-
     try:
-        # 1. Obtiene artistas similares al historial
-        similar_artists = set()
-        sample = random.sample(history, min(3, len(history)))
-        for artist in sample:
-            similar = query_gen.lastfm.get_similar_artists(artist, limit=10)
-            for s in similar:
-                if s.match < 0.7:  # no los más famosos
-                    similar_artists.add(s.name)
+        # Página aleatoria para variedad cada vez
+        page = random.randint(1, 10)
 
-        if not similar_artists:
-            similar_artists = set(history)
+        params = {
+            "method":  "chart.getTopTracks",
+            "api_key": LASTFM_API_KEY,
+            "format":  "json",
+            "limit":   50,
+            "page":    page,
+        }
+        resp = req.get(LASTFM_URL, params=params, timeout=10)
+        data = resp.json()
+        tracks = data.get("tracks", {}).get("track", [])
 
-        similar_list = list(similar_artists)
-        random.shuffle(similar_list)
-
-        # 2. Para cada artista similar, obtiene sus top tracks
-        candidates = []
-        for artist in similar_list[:6]:
-            tracks = query_gen.lastfm.get_top_tracks(artist, limit=5)
-            for track in tracks:
-                candidates.append((artist, track))
-
-        if not candidates:
+        if not tracks:
             return jsonify({"error": "No se encontraron hits. Intenta de nuevo."}), 404
 
-        random.shuffle(candidates)
+        # Mezcla aleatoria
+        random.shuffle(tracks)
 
-        # 3. Busca en YouTube — bloquea canal Genius
-        BLOCKED_CHANNELS = {"genius", "genius espanol", "genius india", "rap genius"}
-        results = []
-        seen_artists = set()
+        # Filtra — máximo 2 por artista
+        BLOCKED_CHANNELS = {"genius", "genius espanol", "genius india"}
+        results      = []
+        artist_count = {}
 
-        for artist, track in candidates[:10]:
-            if artist.lower() in seen_artists:
+        for track in tracks:
+            if len(results) >= 5:
+                break
+
+            artist = track.get("artist", {}).get("name", "")
+            title  = track.get("name", "")
+            if not artist or not title:
                 continue
-            query  = f"{artist} {track} official"
+
+            # Máximo 2 por artista
+            count = artist_count.get(artist.lower(), 0)
+            if count >= 2:
+                continue
+
+            query  = f"{artist} {title} official"
             videos = fetcher._fetch_one(query, artist)
 
             # Filtra canal Genius
             filtered = [
                 v for v in videos
-                if v.channel.lower() not in BLOCKED_CHANNELS
-                and "genius" not in v.channel.lower()
+                if "genius" not in v.channel.lower()
             ]
             ranked = scorer.filter_and_score(filtered, "")
+
             if ranked:
                 r = ranked[0]
                 results.append({
@@ -886,10 +881,7 @@ def gems():
                     "target_artist": artist,
                     "score":         r.score,
                 })
-                seen_artists.add(artist.lower())
-
-            if len(results) >= 5:
-                break
+                artist_count[artist.lower()] = count + 1
 
         if not results:
             return jsonify({"error": "No se encontraron hits. Intenta de nuevo."}), 404
