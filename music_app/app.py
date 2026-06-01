@@ -817,59 +817,67 @@ def resolve():
 @app.route("/gems", methods=["POST"])
 def gems():
     """
-    Hits reales — chart.getTopTracks de Last.fm.
-    Canciones con millones de plays, de cualquier época.
-    Máximo 2 apariciones del mismo artista.
+    Hits reales mezclados por épocas.
+    Distribución aleatoria de décadas cada vez.
+    Máximo 2 por artista.
     """
+    DECADES = {
+        "70s": ["David Bowie", "Led Zeppelin", "Queen", "Fleetwood Mac", "ABBA",
+                "Elton John", "The Eagles", "Pink Floyd", "Stevie Wonder", "Bee Gees"],
+        "80s": ["Michael Jackson", "Madonna", "Prince", "Depeche Mode", "U2",
+                "Whitney Houston", "Guns N Roses", "The Cure", "Duran Duran", "Cyndi Lauper"],
+        "90s": ["Nirvana", "Tupac", "Backstreet Boys", "Oasis", "Spice Girls",
+                "Eminem", "Notorious B.I.G.", "TLC", "Alanis Morissette", "Pearl Jam"],
+        "2000s": ["Beyonce", "Linkin Park", "Shakira", "50 Cent", "Nelly",
+                  "Coldplay", "Amy Winehouse", "Kanye West", "The Killers", "Rihanna"],
+        "2010s": ["Adele", "Drake", "Ed Sheeran", "Kendrick Lamar", "Taylor Swift",
+                  "The Weeknd", "Billie Eilish", "Post Malone", "Lorde", "Frank Ocean"],
+        "2020s": ["Bad Bunny", "Olivia Rodrigo", "Doja Cat", "Peso Pluma", "SZA",
+                  "Tyler the Creator", "Karol G", "Harry Styles", "Rauw Alejandro", "Feid"],
+    }
+
     try:
-        # Página aleatoria para variedad cada vez
-        page = random.randint(1, 10)
+        # Distribución aleatoria de épocas — 5 slots repartidos al azar
+        all_decades = list(DECADES.keys())
+        # Elige 3-4 décadas distintas al azar
+        num_decades = random.randint(3, 4)
+        chosen_decades = random.sample(all_decades, num_decades)
 
-        params = {
-            "method":  "chart.getTopTracks",
-            "api_key": LASTFM_API_KEY,
-            "format":  "json",
-            "limit":   50,
-            "page":    page,
-        }
-        resp = req.get(LASTFM_URL, params=params, timeout=10)
-        data = resp.json()
-        tracks = data.get("tracks", {}).get("track", [])
+        # Reparte 5 slots entre las décadas elegidas
+        slots = [1] * num_decades
+        extras = 5 - num_decades
+        for _ in range(extras):
+            slots[random.randint(0, num_decades - 1)] += 1
 
-        if not tracks:
-            return jsonify({"error": "No se encontraron hits. Intenta de nuevo."}), 404
+        # Construye lista de artistas por época
+        candidates = []
+        for i, decade in enumerate(chosen_decades):
+            artists = random.sample(DECADES[decade], min(slots[i] + 2, len(DECADES[decade])))
+            for artist in artists:
+                candidates.append((decade, artist))
 
-        # Mezcla aleatoria
-        random.shuffle(tracks)
+        random.shuffle(candidates)
 
-        # Filtra — máximo 2 por artista
-        BLOCKED_CHANNELS = {"genius", "genius espanol", "genius india"}
+        # Busca en YouTube
+        BLOCKED = {"genius", "genius espanol", "genius india"}
         results      = []
         artist_count = {}
 
-        for track in tracks:
+        for decade, artist in candidates:
             if len(results) >= 5:
                 break
-
-            artist = track.get("artist", {}).get("name", "")
-            title  = track.get("name", "")
-            if not artist or not title:
+            if artist_count.get(artist.lower(), 0) >= 2:
                 continue
 
-            # Máximo 2 por artista
-            count = artist_count.get(artist.lower(), 0)
-            if count >= 2:
+            tracks = query_gen.lastfm.get_top_tracks(artist, limit=3)
+            if not tracks:
                 continue
+            track = tracks[0]  # el hit más conocido
 
-            query  = f"{artist} {title} official"
-            videos = fetcher._fetch_one(query, artist)
-
-            # Filtra canal Genius
-            filtered = [
-                v for v in videos
-                if "genius" not in v.channel.lower()
-            ]
-            ranked = scorer.filter_and_score(filtered, "")
+            query   = f"{artist} {track} official"
+            videos  = fetcher._fetch_one(query, artist)
+            filtered = [v for v in videos if "genius" not in v.channel.lower()]
+            ranked  = scorer.filter_and_score(filtered, "")
 
             if ranked:
                 r = ranked[0]
@@ -879,14 +887,15 @@ def gems():
                     "duration":      r.duration_fmt(),
                     "channel":       r.channel,
                     "target_artist": artist,
+                    "decade":        decade,
                     "score":         r.score,
                 })
-                artist_count[artist.lower()] = count + 1
+                artist_count[artist.lower()] = artist_count.get(artist.lower(), 0) + 1
 
         if not results:
             return jsonify({"error": "No se encontraron hits. Intenta de nuevo."}), 404
 
-        return jsonify({"results": results})
+        return jsonify({"results": results, "decades": list(set(r["decade"] for r in results))})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
