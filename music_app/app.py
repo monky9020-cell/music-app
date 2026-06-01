@@ -520,8 +520,18 @@ class YouTubeFetcher:
         key = self._key(query)
         cached = self._cache_get(key)
         if cached:
-            return [VideoResult(**{**v, "target_artist": target_artist})
-                    for v in cached]
+            results = []
+            for v in cached:
+                try:
+                    if isinstance(v, dict):
+                        results.append(VideoResult(**{**v, "target_artist": target_artist}))
+                    elif isinstance(v, str):
+                        parsed = json.loads(v)
+                        results.append(VideoResult(**{**parsed, "target_artist": target_artist}))
+                except Exception:
+                    continue
+            if results:
+                return results
         opts = {
             "quiet": True, "no_warnings": True,
             "extract_flat": True, "skip_download": True,
