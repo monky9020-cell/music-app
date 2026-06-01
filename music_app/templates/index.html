@@ -690,7 +690,7 @@ async function findGems() {
     // Muestra resultados como coincidencias
     renderResults({
       title:     'Hits del momento',
-      artist:    'Sonar',
+      artist:    data.decades ? data.decades.join(' · ') : 'Sonar',
       top:       data.results.slice(0, 5),
       secondary: [],
       results:   data.results,
