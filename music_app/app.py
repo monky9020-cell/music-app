@@ -928,6 +928,24 @@ def _song_key(title: str, artist: str) -> str:
     raw = f"{title}:{artist}".lower()
     return hashlib.md5(raw.encode()).hexdigest()[:16]
 
+@app.route("/unlike", methods=["POST"])
+def unlike():
+    """Decrementa el contador de likes de una canción."""
+    data   = request.get_json()
+    title  = data.get("title", "").strip()
+    artist = data.get("target_artist", "").strip()
+    if not title or not artist:
+        return jsonify({"error": "Datos incompletos"}), 400
+    try:
+        sk  = _song_key(title, artist)
+        key = _week_key(sk)
+        val = redis_get(key)
+        count = max(0, int(val) - 1) if val else 0
+        redis_set(key, str(count), 60 * 60 * 24 * 8)
+        return jsonify({"likes": count})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route("/like", methods=["POST"])
 def like():
     data   = request.get_json()
