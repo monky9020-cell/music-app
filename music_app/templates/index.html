@@ -31,6 +31,18 @@
   .btn-gems:hover{background:#1db95415;border-color:#1db954}
   .btn-gems span{font-size:16px}
 
+
+  /* DNA Musical */
+  .dna-card{background:#111;border:1px solid #1db95433;border-radius:16px;padding:18px 20px;margin-bottom:24px}
+  .dna-label{font-size:11px;color:#1db954;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+  .dna-empty{font-size:13px;color:#555}
+  .dna-genres{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+  .dna-genre{font-size:12px;background:#1db95420;color:#1db954;border:1px solid #1db95440;padding:3px 10px;border-radius:50px}
+  .dna-artists{font-size:12px;color:#a0a0a0;margin-bottom:8px}
+  .dna-phrase{font-size:14px;font-weight:600;color:#fff;margin-bottom:12px;font-style:italic}
+  .dna-share{background:none;border:1px solid #2a2a2a;border-radius:50px;padding:6px 14px;color:#a0a0a0;font-size:12px;cursor:pointer;transition:all .15s}
+  .dna-share:hover{border-color:#1db954;color:#1db954}
+  .dna-stats{font-size:11px;color:#555;margin-bottom:10px}
   /* Explorar por estilo */
   .explore-section{margin-bottom:28px}
   .explore-label{font-size:11px;color:#737373;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;display:block}
@@ -168,6 +180,11 @@
   .ad-banner{position:fixed;bottom:0;left:0;right:0;background:#111;border-top:1px solid #1e1e1e;height:56px;display:flex;align-items:center;justify-content:center;z-index:50}
   .ad-banner span{font-size:11px;color:#333}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+<style>
+  .waves-container{position:fixed;bottom:56px;left:0;right:0;height:40px;display:flex;align-items:flex-end;justify-content:center;gap:2px;padding:0 10px;pointer-events:none;z-index:40;opacity:0.4}
+  .wave-bar{width:2px;background:#1db954;border-radius:2px;transform-origin:bottom}
+</style>
 </head>
 <body>
 
@@ -189,6 +206,14 @@
 
   <!-- Breadcrumb -->
   <div class="breadcrumb" id="breadcrumb"></div>
+
+  <!-- DNA Musical -->
+  <div class="dna-card" id="dna-card">
+    <div class="dna-label">🧬 Tu DNA Musical</div>
+    <div id="dna-content">
+      <div class="dna-empty">Da 👍 a canciones para ver tu perfil musical aquí.</div>
+    </div>
+  </div>
 
   <!-- Canción del día -->
   <div class="daily-card" id="daily-card">
@@ -293,6 +318,9 @@
     <button class="ad-continue" onclick="closeAd()">Continuar gratis →</button>
   </div>
 </div>
+
+<!-- Ondas de sonido -->
+<div class="waves-container" id="waves-container"></div>
 
 <!-- Banner inferior -->
 <div class="ad-banner">
@@ -748,8 +776,29 @@ async function exploreStyle(style) {
 
 async function handleLike(btn, r) {
   const likeKey = `liked:${r.url}`
-  if (localStorage.getItem(likeKey) === '1') return // ya dio like
+  const alreadyLiked = localStorage.getItem(likeKey) === '1'
+  const countEl = btn.querySelector('.like-count')
+  const currentCount = parseInt(countEl?.textContent || '0')
 
+  if (alreadyLiked) {
+    // Quitar like
+    localStorage.removeItem(likeKey)
+    btn.classList.remove('liked')
+    if (countEl) countEl.textContent = Math.max(0, currentCount - 1)
+    buildDNA()
+    // Notifica al servidor para decrementar
+    try {
+      await fetch('/unlike', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({title: r.title, target_artist: r.target_artist, url: r.url})
+      })
+      loadTrending()
+    } catch(e) {}
+    return
+  }
+
+  // Dar like
   try {
     const resp = await fetch('/like', {
       method: 'POST',
@@ -760,9 +809,8 @@ async function handleLike(btn, r) {
     if (data.likes !== undefined) {
       localStorage.setItem(likeKey, '1')
       btn.classList.add('liked')
-      const countEl = btn.querySelector('.like-count')
+      buildDNA()
       if (countEl) countEl.textContent = data.likes
-      // Refresca trending
       loadTrending()
     }
   } catch(e) {}
@@ -850,9 +898,218 @@ if (sharedQ) {
 updateSurpriseBtn()
 loadDailySong()
 loadTrending()
+buildDNA()
 
 document.getElementById('query').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch() })
 document.getElementById('artist').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch() })
+
+
+// ── DNA Musical ────────────────────────────────────────────
+const ARTIST_GENRES = {
+  // Rock
+  'deftones':'Rock','tool':'Rock','nirvana':'Rock','radiohead':'Rock',
+  'arctic monkeys':'Rock','interpol':'Rock','the cure':'Rock',
+  'queens of the stone age':'Rock','muse':'Rock','placebo':'Rock',
+  'soundgarden':'Rock','alice in chains':'Rock','pearl jam':'Rock',
+  'linkin park':'Rock','system of a down':'Rock','korn':'Rock',
+  // Electronic
+  'crystal castles':'Electronic','burial':'Electronic','massive attack':'Electronic',
+  'portishead':'Electronic','four tet':'Electronic','boards of canada':'Electronic',
+  'aphex twin':'Electronic','bonobo':'Electronic','caribou':'Electronic',
+  'the xx':'Electronic','james blake':'Electronic','moderat':'Electronic',
+  // Reggaeton/Urbano
+  'bad bunny':'Reggaeton','j balvin':'Reggaeton','feid':'Reggaeton',
+  'rauw alejandro':'Reggaeton','karol g':'Reggaeton','ozuna':'Reggaeton',
+  'peso pluma':'Corridos','natanael cano':'Corridos','eslabon armado':'Corridos',
+  'mora':'Urbano Latino','sech':'Urbano Latino','jhay cortez':'Urbano Latino',
+  // Hip-Hop
+  'kendrick lamar':'Hip-Hop','tyler the creator':'Hip-Hop','frank ocean':'Hip-Hop',
+  'drake':'Hip-Hop','travis scott':'Hip-Hop','jpegmafia':'Hip-Hop',
+  // Pop
+  'the weeknd':'Pop','billie eilish':'Pop','dua lipa':'Pop',
+  'taylor swift':'Pop','ariana grande':'Pop','harry styles':'Pop',
+  // Indie
+  'phoebe bridgers':'Indie','big thief':'Indie','sufjan stevens':'Indie',
+  'beach house':'Indie','bon iver':'Indie','fleet foxes':'Indie',
+  // Ambient
+  'brian eno':'Ambient','tim hecker':'Ambient','nils frahm':'Ambient',
+}
+
+const DNA_PHRASES = {
+  single: {
+    'Rock': 'Guitarras en las venas',
+    'Electronic': 'Viajero de frecuencias',
+    'Reggaeton': 'Del bloque al mundo',
+    'Hip-Hop': 'Letras que pesan',
+    'Pop': 'Melodies first',
+    'Indie': 'Fuera del mainstream',
+    'Ambient': 'Sonidos del universo',
+    'Corridos': 'Tierra y ritmo',
+    'Urbano Latino': 'El sabor latino',
+  },
+  multi: [
+    'Sin fronteras musicales',
+    'Un oído para todo',
+    'La mezcla perfecta',
+    'Géneros sin límites',
+    'Tu propio algoritmo',
+  ]
+}
+
+function buildDNA() {
+  // Lee likes del localStorage
+  const likedKeys = Object.keys(localStorage).filter(k => k.startsWith('liked:'))
+  
+  // Obtiene artistas likeados desde lastResults
+  const likedArtists = []
+  likedKeys.forEach(k => {
+    // Busca en lastResults el artista correspondiente
+    const url = k.replace('liked:', '')
+    const r = lastResults.find(r => r.url === url)
+    if (r) likedArtists.push(r.target_artist.toLowerCase())
+  })
+
+  const card = document.getElementById('dna-content')
+  
+  if (likedArtists.length === 0) {
+    card.innerHTML = '<div class="dna-empty">Da 👍 a canciones para ver tu perfil musical aquí.</div>'
+    return
+  }
+
+  // Detecta géneros
+  const genreCount = {}
+  likedArtists.forEach(a => {
+    const g = ARTIST_GENRES[a] || 'Variado'
+    genreCount[g] = (genreCount[g] || 0) + 1
+  })
+
+  const genres = Object.entries(genreCount)
+    .sort((a,b) => b[1]-a[1])
+    .map(e => e[0])
+
+  // Artistas únicos
+  const uniqueArtists = [...new Set(likedArtists)]
+    .map(a => a.charAt(0).toUpperCase() + a.slice(1))
+    .slice(0, 4)
+
+  // Frase
+  let phrase = ''
+  if (genres.length === 1) {
+    phrase = DNA_PHRASES.single[genres[0]] || 'Tu propio vibe'
+  } else {
+    phrase = DNA_PHRASES.multi[Math.floor(Math.random() * DNA_PHRASES.multi.length)]
+  }
+
+  card.innerHTML = `
+    <div class="dna-genres">${genres.map(g => `<span class="dna-genre">${g}</span>`).join('')}</div>
+    <div class="dna-artists">${uniqueArtists.join(' · ')}</div>
+    <div class="dna-phrase">"${phrase}"</div>
+    <div class="dna-stats">👍 ${likedArtists.length} canciones likeadas</div>
+    <button class="dna-share" onclick="shareDNA('${phrase}', '${genres.join(', ')}')">📤 Compartir mi DNA</button>
+  `
+}
+
+function shareDNA(phrase, genres) {
+  const text = `🎵 Mi DNA Musical en Sonar:\n${genres}\n"${phrase}"\n\nhttps://music-app-a8ce.onrender.com`
+  navigator.clipboard.writeText(text).then(() => {
+    const toast = document.getElementById('toast')
+    toast.textContent = '🧬 DNA copiado'
+    toast.classList.add('show')
+    setTimeout(() => { toast.classList.remove('show'); toast.textContent = '🔗 Link copiado' }, 2500)
+  }).catch(() => prompt('Copia tu DNA:', text))
+}
+
+// ── Anime.js animations ────────────────────────────────────
+// Entrada del header
+anime({
+  targets: '.header',
+  opacity: [0, 1],
+  translateY: [-20, 0],
+  duration: 800,
+  easing: 'easeOutExpo'
+})
+
+// Entrada del tagline
+anime({
+  targets: '.tagline',
+  opacity: [0, 1],
+  duration: 800,
+  delay: 200,
+  easing: 'easeOutExpo'
+})
+
+// Entrada del botón hits
+anime({
+  targets: '.btn-gems',
+  opacity: [0, 1],
+  translateX: [-20, 0],
+  duration: 700,
+  delay: 400,
+  easing: 'easeOutExpo'
+})
+
+// Entrada del form card
+anime({
+  targets: '.form-card',
+  opacity: [0, 1],
+  translateY: [20, 0],
+  duration: 700,
+  delay: 300,
+  easing: 'easeOutExpo'
+})
+
+// Pulso suave en el logo
+anime({
+  targets: '.logo-circle',
+  scale: [1, 1.07, 1],
+  duration: 2500,
+  loop: true,
+  easing: 'easeInOutSine',
+  delay: 1500
+})
+
+// Hover suave en result cards
+document.addEventListener('mouseover', e => {
+  const card = e.target.closest('.result-card')
+  if (card) anime({targets: card, translateX: 3, duration: 200, easing: 'easeOutSine'})
+})
+document.addEventListener('mouseout', e => {
+  const card = e.target.closest('.result-card')
+  if (card) anime({targets: card, translateX: 0, duration: 200, easing: 'easeOutSine'})
+})
+
+// Ondas de sonido animadas
+const wc = document.getElementById('waves-container')
+if (wc) {
+  for (let i = 0; i < 50; i++) {
+    const w = document.createElement('div')
+    w.className = 'wave-bar'
+    w.style.height = (Math.random() * 25 + 4) + 'px'
+    wc.appendChild(w)
+  }
+  anime({
+    targets: '.wave-bar',
+    height: function() { return anime.random(4, 28) + 'px' },
+    duration: 700,
+    easing: 'easeInOutSine',
+    loop: true,
+    delay: anime.stagger(40)
+  })
+}
+
+// Animación al mostrar resultados
+const origRender = renderResults
+window.renderResults = function(data) {
+  origRender(data)
+  anime({
+    targets: '.result-card',
+    opacity: [0, 1],
+    translateX: [-20, 0],
+    duration: 500,
+    delay: anime.stagger(80),
+    easing: 'easeOutExpo'
+  })
+}
 </script>
 </body>
 </html>
