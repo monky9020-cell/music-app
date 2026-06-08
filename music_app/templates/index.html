@@ -124,6 +124,18 @@
     .results-header{flex-wrap:wrap}
     .results-header span{font-size:11px;width:100%;margin-top:2px}
     .btn-share{padding:3px}
+    .result-card{gap:6px;padding:10px 10px}
+    .result-num{width:14px;font-size:12px}
+    .result-info{flex:1;min-width:0;overflow:hidden;width:0}
+    .result-title{font-size:12px}
+    .result-sub{font-size:10px}
+    .btn-like{padding:3px 4px;font-size:11px}
+    .btn-like svg{width:12px;height:12px}
+    .badge-radar{display:none}
+    .result-dur{display:none}
+    .btn-share{display:none}
+    .btn-radio{padding:4px 8px;font-size:11px}
+    .btn-yt svg{width:16px;height:16px}
   }
   .btn-share{background:none;border:none;color:#555;cursor:pointer;flex-shrink:0;padding:6px;border-radius:6px;display:flex;align-items:center;transition:color .15s}
   .btn-share:hover{color:#1db954}
@@ -642,8 +654,9 @@ function makeCard(r, globalIdx, secondary = false) {
   card.className = 'result-card'
   if (secondary) card.style.opacity = '0.8'
 
-  // Detecta si es "bajo el radar" — menos de 500K vistas aproximado por score bajo
-  const isRadar = r.score < 2.0 && r.score > 0
+  // Detecta si es "bajo el radar" — entre 50K y 300K vistas
+  const vc = r.view_count || 0
+  const isRadar = vc >= 50000 && vc <= 300000
 
   // Verifica si ya dio like (localStorage)
   const likeKey = `liked:${r.url}`
