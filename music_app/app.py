@@ -696,6 +696,7 @@ def recommend(raw_input: str, artist: str, n: int = 10) -> dict:
             "channel":       r.channel,
             "target_artist": r.target_artist,
             "score":         r.score,
+            "view_count":    r.view_count,
         }
 
     return {
