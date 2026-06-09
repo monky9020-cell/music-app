@@ -32,6 +32,20 @@
   .btn-gems span{font-size:16px}
 
 
+
+  /* Menú hamburguesa */
+  .menu-btn{position:fixed;top:16px;right:16px;z-index:500;background:#111;border:1px solid #2a2a2a;border-radius:10px;padding:8px 10px;cursor:pointer;display:flex;flex-direction:column;gap:4px;transition:border-color .15s}
+  .menu-btn:hover{border-color:#1db954}
+  .menu-btn span{display:block;width:18px;height:2px;background:#a0a0a0;border-radius:2px;transition:background .15s}
+  .menu-btn:hover span{background:#1db954}
+  .menu-overlay{position:fixed;inset:0;background:#000000aa;z-index:400;display:none;opacity:0;transition:opacity .2s}
+  .menu-overlay.open{display:block;opacity:1}
+  .menu-panel{position:fixed;top:0;right:-320px;width:300px;height:100vh;background:#111;border-left:1px solid #1e1e1e;z-index:450;transition:right .3s ease;overflow-y:auto;padding:20px}
+  .menu-panel.open{right:0}
+  .menu-close{position:absolute;top:16px;right:16px;background:none;border:none;color:#555;font-size:20px;cursor:pointer;transition:color .15s}
+  .menu-close:hover{color:#fff}
+  .menu-title{font-size:11px;color:#555;text-transform:uppercase;letter-spacing:1px;margin:24px 0 12px}
+  .menu-title:first-of-type{margin-top:40px}
   /* DNA Musical */
   .dna-card{background:#111;border:1px solid #1db95433;border-radius:16px;padding:18px 20px;margin-bottom:24px}
   .dna-label{font-size:11px;color:#1db954;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;display:flex;align-items:center;gap:6px}
@@ -200,6 +214,39 @@
 </head>
 <body>
 
+
+<!-- Botón hamburguesa -->
+<button class="menu-btn" onclick="toggleMenu()" aria-label="Menú">
+  <span></span><span></span><span></span>
+</button>
+
+<!-- Overlay -->
+<div class="menu-overlay" id="menu-overlay" onclick="toggleMenu()"></div>
+
+<!-- Panel del menú -->
+<div class="menu-panel" id="menu-panel">
+  <button class="menu-close" onclick="toggleMenu()">✕</button>
+
+  <div class="menu-title">🧬 Tu DNA Musical</div>
+  <div class="dna-card" id="dna-card-menu" style="margin-bottom:0">
+    <div id="dna-content-menu">
+      <div class="dna-empty">Da 👍 a canciones para ver tu perfil musical aquí.</div>
+    </div>
+  </div>
+
+  <div class="menu-title">🎸 Explorar por estilo</div>
+  <div class="explore-grid" id="menu-explore-grid">
+    <button class="explore-btn" onclick="exploreStyle('heavy');toggleMenu()"><span>🎸</span><span>Guitarras pesadas</span></button>
+    <button class="explore-btn" onclick="exploreStyle('atmospheric');toggleMenu()"><span>🌊</span><span>Atmosférico</span></button>
+    <button class="explore-btn" onclick="exploreStyle('electronic');toggleMenu()"><span>🤖</span><span>Electrónico</span></button>
+    <button class="explore-btn" onclick="exploreStyle('rhythmic');toggleMenu()"><span>🥁</span><span>Con ritmo</span></button>
+    <button class="explore-btn" onclick="exploreStyle('melodic');toggleMenu()"><span>🎹</span><span>Melódico</span></button>
+    <button class="explore-btn" onclick="exploreStyle('dark');toggleMenu()"><span>🌙</span><span>Oscuro</span></button>
+    <button class="explore-btn" onclick="exploreStyle('bright');toggleMenu()"><span>☀️</span><span>Luminoso</span></button>
+    <button class="explore-btn" onclick="exploreStyle('urban');toggleMenu()"><span>🎤</span><span>Urbano</span></button>
+  </div>
+</div>
+
 <div class="app">
 
   <!-- Header -->
@@ -218,14 +265,6 @@
 
   <!-- Breadcrumb -->
   <div class="breadcrumb" id="breadcrumb"></div>
-
-  <!-- DNA Musical -->
-  <div class="dna-card" id="dna-card">
-    <div class="dna-label">🧬 Tu DNA Musical</div>
-    <div id="dna-content">
-      <div class="dna-empty">Da 👍 a canciones para ver tu perfil musical aquí.</div>
-    </div>
-  </div>
 
   <!-- Canción del día -->
   <div class="daily-card" id="daily-card">
@@ -299,20 +338,7 @@
   <!-- Empty -->
   <div class="empty" id="empty">No se encontraron resultados. Intenta con otro artista.</div>
 
-  <!-- Explorar por estilo (abajo) -->
-  <div class="explore-section" style="margin-top:36px">
-    <span class="explore-label">Explorar por estilo</span>
-    <div class="explore-grid">
-      <button class="explore-btn" onclick="exploreStyle('heavy')"><span>🎸</span><span>Guitarras pesadas</span></button>
-      <button class="explore-btn" onclick="exploreStyle('atmospheric')"><span>🌊</span><span>Atmosférico</span></button>
-      <button class="explore-btn" onclick="exploreStyle('electronic')"><span>🤖</span><span>Electrónico</span></button>
-      <button class="explore-btn" onclick="exploreStyle('rhythmic')"><span>🥁</span><span>Con ritmo</span></button>
-      <button class="explore-btn" onclick="exploreStyle('melodic')"><span>🎹</span><span>Melódico</span></button>
-      <button class="explore-btn" onclick="exploreStyle('dark')"><span>🌙</span><span>Oscuro</span></button>
-      <button class="explore-btn" onclick="exploreStyle('bright')"><span>☀️</span><span>Luminoso</span></button>
-      <button class="explore-btn" onclick="exploreStyle('urban')"><span>🎤</span><span>Urbano</span></button>
-    </div>
-  </div>
+
 
 </div>
 
@@ -917,6 +943,21 @@ document.getElementById('query').addEventListener('keydown', e => { if (e.key ==
 document.getElementById('artist').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch() })
 
 
+
+function toggleMenu() {
+  const panel   = document.getElementById('menu-panel')
+  const overlay = document.getElementById('menu-overlay')
+  const isOpen  = panel.classList.contains('open')
+  if (isOpen) {
+    panel.classList.remove('open')
+    overlay.classList.remove('open')
+  } else {
+    panel.classList.add('open')
+    overlay.classList.add('open')
+    buildDNA()
+  }
+}
+
 // ── DNA Musical ────────────────────────────────────────────
 const ARTIST_GENRES = {
   // Rock
@@ -982,10 +1023,10 @@ function buildDNA() {
     if (r) likedArtists.push(r.target_artist.toLowerCase())
   })
 
-  const card = document.getElementById('dna-content')
+  const card2 = document.getElementById('dna-content-menu')
   
   if (likedArtists.length === 0) {
-    card.innerHTML = '<div class="dna-empty">Da 👍 a canciones para ver tu perfil musical aquí.</div>'
+    if(card2) card2.innerHTML = '<div class="dna-empty">Da 👍 a canciones para ver tu perfil musical aquí.</div>'
     return
   }
 
@@ -1013,7 +1054,7 @@ function buildDNA() {
     phrase = DNA_PHRASES.multi[Math.floor(Math.random() * DNA_PHRASES.multi.length)]
   }
 
-  card.innerHTML = `
+  const dnaHTML = `
     <div class="dna-genres">${genres.map(g => `<span class="dna-genre">${g}</span>`).join('')}</div>
     <div class="dna-artists">${uniqueArtists.join(' · ')}</div>
     <div class="dna-phrase">"${phrase}"</div>
