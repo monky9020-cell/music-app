@@ -277,6 +277,7 @@
     <div class="daily-actions">
       <button class="daily-btn primary" onclick="dailySearch()">Buscar similares</button>
       <button class="daily-btn" onclick="openYT(dailySongUrl)">Abrir en YouTube</button>
+      <button class="daily-btn" id="daily-like-btn" onclick="likeDailySong()">👍 <span id="daily-like-count">0</span></button>
     </div>
   </div>
 
@@ -559,11 +560,65 @@ function loadDailySong() {
   .catch(() => {})
 }
 
+async function likeDailySong() {
+  const saved = JSON.parse(localStorage.getItem('dailySong') || 'null')
+  if (!saved) return
+
+  const likeKey = `liked:${saved.url}`
+  const btn = document.getElementById('daily-like-btn')
+  const countEl = document.getElementById('daily-like-count')
+  const alreadyLiked = localStorage.getItem(likeKey) === '1'
+  const currentCount = parseInt(countEl?.textContent || '0')
+
+  if (alreadyLiked) {
+    localStorage.removeItem(likeKey)
+    btn.style.color = ''
+    if (countEl) countEl.textContent = Math.max(0, currentCount - 1)
+    try {
+      await fetch('/unlike', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({title: saved.title, target_artist: saved.artist, url: saved.url})
+      })
+    } catch(e) {}
+    return
+  }
+
+  try {
+    const resp = await fetch('/like', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({title: saved.title, target_artist: saved.artist, url: saved.url})
+    })
+    const data = await resp.json()
+    if (data.likes !== undefined) {
+      localStorage.setItem(likeKey, '1')
+      btn.style.color = '#1db954'
+      if (countEl) countEl.textContent = data.likes
+      buildDNA()
+      loadTrending()
+    }
+  } catch(e) {}
+}
+
 function showDailyCard(data) {
   dailySongUrl = data.url
   document.getElementById('daily-title').textContent = data.title
   document.getElementById('daily-sub').textContent = `De tu historial · ${data.artist}`
   document.getElementById('daily-card').className = 'daily-card visible'
+
+  // Cargar estado del like
+  const likeKey = `liked:${data.url}`
+  const btn = document.getElementById('daily-like-btn')
+  if (localStorage.getItem(likeKey) === '1' && btn) {
+    btn.style.color = '#1db954'
+  }
+  // Cargar contador
+  const sk = btoa(encodeURIComponent(`${data.title}:${data.artist}`)).slice(0, 16)
+  fetch(`/likes/${sk}`).then(r => r.json()).then(d => {
+    const el = document.getElementById('daily-like-count')
+    if (el) el.textContent = d.likes || 0
+  }).catch(() => {})
 }
 
 function dailySearch() {
