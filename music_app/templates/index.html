@@ -33,6 +33,39 @@
 
 
 
+
+  /* Playlists */
+  .btn-add{background:none;border:none;color:#555;cursor:pointer;flex-shrink:0;padding:5px;border-radius:6px;display:flex;align-items:center;transition:color .15s;font-size:16px}
+  .btn-add:hover{color:#1db954}
+  .pl-modal{position:fixed;inset:0;background:#000000bb;z-index:600;display:none;align-items:center;justify-content:center}
+  .pl-modal.open{display:flex}
+  .pl-box{background:#111;border:1px solid #2a2a2a;border-radius:16px;padding:24px;width:90%;max-width:340px}
+  .pl-box h3{font-size:15px;font-weight:600;margin-bottom:16px}
+  .pl-new{display:flex;gap:8px;margin-bottom:16px}
+  .pl-new input{flex:1;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;padding:8px 12px;color:#fff;font-size:13px;outline:none}
+  .pl-new input:focus{border-color:#1db954}
+  .pl-new button{background:#1db954;color:#000;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer}
+  .pl-list{max-height:200px;overflow-y:auto}
+  .pl-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;cursor:pointer;transition:background .15s}
+  .pl-item:hover{background:#1a1a1a}
+  .pl-item-name{flex:1;font-size:13px;color:#fff}
+  .pl-item-count{font-size:11px;color:#555}
+  .pl-cancel{width:100%;margin-top:12px;background:none;border:1px solid #2a2a2a;border-radius:50px;padding:8px;color:#737373;font-size:13px;cursor:pointer}
+  .pl-cancel:hover{border-color:#555}
+  .menu-pl-item{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:8px;cursor:pointer;transition:background .15s;margin-bottom:4px}
+  .menu-pl-item:hover{background:#1a1a1a}
+  .menu-pl-name{font-size:13px;color:#fff}
+  .menu-pl-count{font-size:11px;color:#555}
+  .pl-song{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #1a1a1a}
+  .pl-song:last-child{border-bottom:none}
+  .pl-song-info{flex:1;min-width:0}
+  .pl-song-title{font-size:12px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pl-song-artist{font-size:11px;color:#555}
+  .pl-song-yt{background:none;border:none;color:#555;cursor:pointer;font-size:14px;flex-shrink:0}
+  .pl-song-yt:hover{color:#fff}
+  .pl-song-del{background:none;border:none;color:#555;cursor:pointer;font-size:12px;flex-shrink:0}
+  .pl-song-del:hover{color:#ff6b6b}
+  .pl-empty{font-size:12px;color:#555;padding:8px 0}
   /* Menú hamburguesa */
   .menu-btn{position:fixed;top:16px;right:16px;z-index:500;background:#111;border:1px solid #2a2a2a;border-radius:10px;padding:8px 10px;cursor:pointer;display:flex;flex-direction:column;gap:4px;transition:border-color .15s}
   .menu-btn:hover{border-color:#1db954}
@@ -234,7 +267,10 @@
     </div>
   </div>
 
-  <div class="menu-title">🎸 Explorar por estilo</div>
+  <div class="menu-title">🎵 Mis playlists</div>
+  <div id="menu-playlists"><div class="dna-empty">No tienes playlists aún.</div></div>
+
+    <div class="menu-title">🎸 Explorar por estilo</div>
   <div class="explore-grid" id="menu-explore-grid">
     <button class="explore-btn" onclick="exploreStyle('heavy');toggleMenu()"><span>🎸</span><span>Guitarras pesadas</span></button>
     <button class="explore-btn" onclick="exploreStyle('atmospheric');toggleMenu()"><span>🌊</span><span>Atmosférico</span></button>
@@ -364,6 +400,19 @@
 <!-- Banner inferior -->
 <div class="ad-banner">
   <span>Publicidad — [ Google AdSense Banner ] · <a href="/privacy" style="color:#555;text-decoration:none">Privacidad</a> · <a href="/terms" style="color:#555;text-decoration:none">Términos</a> · <a href="/about" style="color:#555;text-decoration:none">Acerca de</a> · © 2026 OCTMON</span>
+</div>
+
+<!-- Modal Playlist -->
+<div class="pl-modal" id="pl-modal">
+  <div class="pl-box">
+    <h3>➕ Agregar a playlist</h3>
+    <div class="pl-new">
+      <input type="text" id="pl-new-input" placeholder="Nueva playlist...">
+      <button onclick="createAndAdd()">Crear</button>
+    </div>
+    <div class="pl-list" id="pl-list"></div>
+    <button class="pl-cancel" onclick="closePlModal()">Cancelar</button>
+  </div>
 </div>
 
 <!-- Toast -->
@@ -764,6 +813,7 @@ function makeCard(r, globalIdx, secondary = false) {
     <button class="btn-share" data-title="${esc(r.title)}" data-artist="${esc(r.target_artist)}" title="Compartir">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
     </button>
+    <button class="btn-add" data-title="${esc(r.title)}" data-artist="${esc(r.target_artist)}" data-url="${esc(r.url)}" data-dur="${r.duration}" title="Agregar a playlist">➕</button>
     <button class="btn-yt" data-url="${esc(r.url)}" title="Abrir en YouTube">
       <svg viewBox="0 0 24 24"><path d="M21.8 8s-.2-1.4-.8-2c-.8-.8-1.6-.8-2-.9C16.6 5 12 5 12 5s-4.6 0-7 .1c-.4.1-1.2.1-2 .9-.6.6-.8 2-.8 2S2 9.6 2 11.2v1.5c0 1.6.2 3.2.2 3.2s.2 1.4.8 2c.8.8 1.8.8 2.3.9C6.8 19 12 19 12 19s4.6 0 7-.2c.4-.1 1.2-.1 2-.9.6-.6.8-2 .8-2s.2-1.6.2-3.2v-1.5C22 9.6 21.8 8 21.8 8zM10 15V9l5.2 3-5.2 3z"/></svg>
     </button>
@@ -783,6 +833,9 @@ function makeCard(r, globalIdx, secondary = false) {
   })
   card.querySelector('.btn-radio').addEventListener('click', function() {
     radioFrom(parseInt(this.dataset.idx))
+  })
+  card.querySelector('.btn-add').addEventListener('click', function() {
+    openPlModal(this.dataset.title, this.dataset.artist, this.dataset.url, this.dataset.dur)
   })
   card.querySelector('.btn-yt').addEventListener('click', function() {
     openYT(this.dataset.url)
@@ -993,6 +1046,7 @@ updateSurpriseBtn()
 loadDailySong()
 loadTrending()
 buildDNA()
+renderMenuPlaylists()
 
 document.getElementById('query').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch() })
 document.getElementById('artist').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch() })
@@ -1010,6 +1064,7 @@ function toggleMenu() {
     panel.classList.add('open')
     overlay.classList.add('open')
     buildDNA()
+    renderMenuPlaylists()
   }
 }
 
@@ -1127,6 +1182,134 @@ function shareDNA(phrase, genres) {
     setTimeout(() => { toast.classList.remove('show'); toast.textContent = '🔗 Link copiado' }, 2500)
   }).catch(() => prompt('Copia tu DNA:', text))
 }
+
+
+// ── Playlists ──────────────────────────────────────────────
+let plCurrentSong = null
+
+function getPlaylists() {
+  return JSON.parse(localStorage.getItem('sonar_playlists') || '[]')
+}
+
+function savePlaylists(pls) {
+  localStorage.setItem('sonar_playlists', JSON.stringify(pls))
+  renderMenuPlaylists()
+}
+
+function openPlModal(title, artist, url, duration) {
+  plCurrentSong = {title, artist, url, duration}
+  const modal = document.getElementById('pl-modal')
+  modal.classList.add('open')
+  document.getElementById('pl-new-input').value = ''
+  renderPlList()
+}
+
+function closePlModal() {
+  document.getElementById('pl-modal').classList.remove('open')
+  plCurrentSong = null
+}
+
+function renderPlList() {
+  const pls  = getPlaylists()
+  const list = document.getElementById('pl-list')
+  if (!pls.length) {
+    list.innerHTML = '<div class="pl-empty">Crea tu primera playlist arriba.</div>'
+    return
+  }
+  list.innerHTML = pls.map((pl, i) => `
+    <div class="pl-item" onclick="addToPlaylist(${i})">
+      <span class="pl-item-name">${esc(pl.name)}</span>
+      <span class="pl-item-count">${pl.songs.length} canciones</span>
+    </div>
+  `).join('')
+}
+
+function createAndAdd() {
+  const name = document.getElementById('pl-new-input').value.trim()
+  if (!name) return
+  const pls = getPlaylists()
+  const newPl = {id: Date.now().toString(), name, songs: []}
+  if (plCurrentSong) newPl.songs.push(plCurrentSong)
+  pls.push(newPl)
+  savePlaylists(pls)
+  showToast('🎵 Playlist creada')
+  closePlModal()
+}
+
+function addToPlaylist(idx) {
+  if (!plCurrentSong) return
+  const pls = getPlaylists()
+  // Evita duplicados
+  const exists = pls[idx].songs.some(s => s.url === plCurrentSong.url)
+  if (exists) { showToast('Ya está en esta playlist'); closePlModal(); return }
+  pls[idx].songs.push(plCurrentSong)
+  savePlaylists(pls)
+  showToast('✅ Agregada a ' + pls[idx].name)
+  closePlModal()
+}
+
+function deleteSongFromPl(plIdx, songIdx) {
+  const pls = getPlaylists()
+  pls[plIdx].songs.splice(songIdx, 1)
+  savePlaylists(pls)
+  renderMenuPlaylists()
+}
+
+function deletePlaylist(plIdx) {
+  const pls = getPlaylists()
+  pls.splice(plIdx, 1)
+  savePlaylists(pls)
+}
+
+function renderMenuPlaylists() {
+  const pls = getPlaylists()
+  const el  = document.getElementById('menu-playlists')
+  if (!el) return
+  if (!pls.length) {
+    el.innerHTML = '<div class="dna-empty">No tienes playlists aún.</div>'
+    return
+  }
+  el.innerHTML = pls.map((pl, i) => `
+    <div>
+      <div class="menu-pl-item" onclick="togglePlView(${i})">
+        <span class="menu-pl-name">🎵 ${esc(pl.name)}</span>
+        <span class="menu-pl-count">${pl.songs.length} · <span onclick="event.stopPropagation();deletePlaylist(${i})" style="color:#555;cursor:pointer">🗑</span></span>
+      </div>
+      <div class="menu-pl-view" id="pl-view-${i}">
+        ${pl.songs.length === 0
+          ? '<div class="pl-empty">Sin canciones aún.</div>'
+          : pl.songs.map((s, j) => `
+            <div class="pl-song">
+              <div class="pl-song-info">
+                <div class="pl-song-title">${esc(s.title)}</div>
+                <div class="pl-song-artist">${esc(s.artist)}</div>
+              </div>
+              <button class="pl-song-yt" onclick="openYT('${esc(s.url)}')">▶</button>
+              <button class="pl-song-del" onclick="deleteSongFromPl(${i},${j})">✕</button>
+            </div>
+          `).join('')
+        }
+      </div>
+    </div>
+  `).join('')
+}
+
+function togglePlView(idx) {
+  const el = document.getElementById('pl-view-' + idx)
+  if (el) el.classList.toggle('open')
+}
+
+function showToast(msg) {
+  const toast = document.getElementById('toast')
+  toast.textContent = msg
+  toast.classList.add('show')
+  setTimeout(() => { toast.classList.remove('show'); toast.textContent = '🔗 Link copiado' }, 2500)
+}
+
+// Cerrar modal al hacer clic fuera
+document.getElementById('pl-modal').addEventListener('click', function(e) {
+  if (e.target === this) closePlModal()
+})
 
 // ── Anime.js animations ────────────────────────────────────
 // Entrada del header
