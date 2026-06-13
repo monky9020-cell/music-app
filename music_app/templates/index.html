@@ -930,6 +930,7 @@ async function handleLike(btn, r) {
   if (alreadyLiked) {
     // Quitar like
     localStorage.removeItem(likeKey)
+    localStorage.removeItem(likeKey + ':artist')
     btn.classList.remove('liked')
     if (countEl) countEl.textContent = Math.max(0, currentCount - 1)
     buildDNA()
@@ -955,6 +956,7 @@ async function handleLike(btn, r) {
     const data = await resp.json()
     if (data.likes !== undefined) {
       localStorage.setItem(likeKey, '1')
+      localStorage.setItem(likeKey + ':artist', r.target_artist)
       btn.classList.add('liked')
       buildDNA()
       if (countEl) countEl.textContent = data.likes
@@ -1127,10 +1129,19 @@ function buildDNA() {
   // Obtiene artistas likeados desde lastResults
   const likedArtists = []
   likedKeys.forEach(k => {
-    // Busca en lastResults el artista correspondiente
+    // Primero intenta obtener el artista guardado directamente
+    const savedArtist = localStorage.getItem(k + ':artist')
+    if (savedArtist) {
+      likedArtists.push(savedArtist.toLowerCase())
+      return
+    }
+    // Fallback: busca en lastResults
     const url = k.replace('liked:', '')
     const r = lastResults.find(r => r.url === url)
-    if (r) likedArtists.push(r.target_artist.toLowerCase())
+    if (r) {
+      likedArtists.push(r.target_artist.toLowerCase())
+      localStorage.setItem(k + ':artist', r.target_artist)
+    }
   })
 
   const card2 = document.getElementById('dna-content-menu')
