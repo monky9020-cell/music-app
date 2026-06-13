@@ -861,7 +861,8 @@ async function findMomento() {
 
   try {
     const hora = new Date().getHours()
-    const resp = await fetch(`/momento?hora=${hora}`)
+    const history = JSON.parse(localStorage.getItem('artistHistory') || '[]')
+    const resp = await fetch(`/momento?hora=${hora}&history=${encodeURIComponent(JSON.stringify(history.slice(0,5)))}`  )
     const data = await resp.json()
     stopProgress()
     btn.disabled = false
@@ -990,23 +991,30 @@ async function handleLike(btn, r) {
     return
   }
 
-  // Dar like
+  // Dar like — guardamos en localStorage primero para que persista
+  localStorage.setItem(likeKey, '1')
+  localStorage.setItem(likeKey + ':artist', r.target_artist || '')
+  btn.classList.add('liked')
+  buildDNA()
+  // Luego notifica al servidor (si falla, el like local ya quedó)
   try {
     const resp = await fetch('/like', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({title: r.title, target_artist: r.target_artist, url: r.url})
+      body: JSON.stringify({
+        title: String(r.title || ''),
+        target_artist: String(r.target_artist || ''),
+        url: String(r.url || '')
+      })
     })
     const data = await resp.json()
-    if (data.likes !== undefined) {
-      localStorage.setItem(likeKey, '1')
-      localStorage.setItem(likeKey + ':artist', r.target_artist)
-      btn.classList.add('liked')
-      buildDNA()
-      if (countEl) countEl.textContent = data.likes
+    if (data.likes !== undefined && countEl) {
+      countEl.textContent = data.likes
       loadTrending()
     }
-  } catch(e) {}
+  } catch(e) {
+    console.log('Like guardado localmente, error servidor:', e)
+  }
 }
 
 async function loadTrending() {
