@@ -825,6 +825,70 @@ def resolve():
     except Exception as e:
         return jsonify({"artist": artist or query}), 200
 
+@app.route("/momento", methods=["GET"])
+def momento():
+    """Recomienda música según la hora del día."""
+    from datetime import datetime
+    import pytz
+
+    hora = datetime.now().hour
+
+    MOMENTOS = {
+        "nocturno":      {"rango": (0, 6),   "label": "🌑 Modo nocturno",      "seeds": ["Burial", "Massive Attack", "Portishead", "Grouper", "Tim Hecker"]},
+        "despertar":     {"rango": (6, 9),   "label": "🌅 Buenos días",         "seeds": ["Bonobo", "Tycho", "Nils Frahm", "Olafur Arnalds", "Bibio"]},
+        "manana":        {"rango": (9, 12),  "label": "☀️ Mañana activa",       "seeds": ["MGMT", "Arctic Monkeys", "Tame Impala", "Phoenix", "Vampire Weekend"]},
+        "mediodia":      {"rango": (12, 15), "label": "🌞 Mediodía",            "seeds": ["Bad Bunny", "Feid", "J Balvin", "Rauw Alejandro", "Karol G"]},
+        "tarde":         {"rango": (15, 18), "label": "🌤 Tarde tranquila",     "seeds": ["Bon Iver", "Beach House", "Slowdive", "Phoebe Bridgers", "Fleet Foxes"]},
+        "noche_temprana":{"rango": (18, 21), "label": "🌆 Noche temprana",      "seeds": ["The Weeknd", "Frank Ocean", "SZA", "Daniel Caesar", "Jhay Cortez"]},
+        "noche":         {"rango": (21, 24), "label": "🌙 Modo noche",          "seeds": ["Crystal Castles", "Nine Inch Nails", "Depeche Mode", "The Cure", "Interpol"]},
+    }
+
+    # Detecta el momento actual
+    momento_actual = None
+    for key, val in MOMENTOS.items():
+        inicio, fin = val["rango"]
+        if inicio <= hora < fin:
+            momento_actual = val
+            break
+
+    if not momento_actual:
+        momento_actual = MOMENTOS["noche"]
+
+    try:
+        artist = random.choice(momento_actual["seeds"])
+        tracks = query_gen.lastfm.get_top_tracks(artist, limit=5)
+        if not tracks:
+            return jsonify({"error": "No se encontró música para este momento"}), 404
+
+        queries = []
+        for seed in random.sample(momento_actual["seeds"], min(4, len(momento_actual["seeds"]))):
+            seed_tracks = query_gen.lastfm.get_top_tracks(seed, limit=3)
+            if seed_tracks:
+                queries.append((f"{seed} {random.choice(seed_tracks)} official", seed))
+
+        raw    = fetcher.fetch_many(queries)
+        ranked = scorer.filter_and_score(raw, "")
+        top    = ranked[:5]
+
+        def fmt(r):
+            return {
+                "title":         r.title,
+                "url":           r.url,
+                "duration":      r.duration_fmt(),
+                "channel":       r.channel,
+                "target_artist": r.target_artist,
+                "score":         r.score,
+                "view_count":    r.view_count,
+            }
+
+        return jsonify({
+            "label":   momento_actual["label"],
+            "results": [fmt(r) for r in top],
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route("/gems", methods=["POST"])
 def gems():
     """
