@@ -829,8 +829,6 @@ def resolve():
 def momento():
     """Recomienda música según la hora del día."""
     from datetime import datetime
-    import pytz
-
     hora = datetime.now().hour
 
     MOMENTOS = {
