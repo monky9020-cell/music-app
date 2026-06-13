@@ -294,10 +294,15 @@
   </div>
   <div class="tagline">Descubre música que <b>sea tuya de verdad</b>. Sin algoritmos comerciales.</div>
 
-  <!-- Botón Hits -->
-  <button class="btn-gems" id="btn-gems" onclick="findGems()">
-    <span>🔥</span> Hits — sorpréndeme
-  </button>
+  <!-- Botones acción -->
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px">
+    <button class="btn-gems" id="btn-gems" onclick="findGems()">
+      <span>🔥</span> Hits — sorpréndeme
+    </button>
+    <button class="btn-gems" id="btn-momento" onclick="findMomento()">
+      <span>🕐</span> Para este momento
+    </button>
+  </div>
 
   <!-- Breadcrumb -->
   <div class="breadcrumb" id="breadcrumb"></div>
@@ -841,6 +846,44 @@ function makeCard(r, globalIdx, secondary = false) {
     openYT(this.dataset.url)
   })
   return card
+}
+
+
+async function findMomento() {
+  const btn = document.getElementById('btn-momento')
+  btn.disabled = true
+  btn.innerHTML = '<span>🕐</span> <span class="dot-anim">Detectando momento</span>'
+
+  setError('')
+  document.getElementById('results-section').style.display = 'none'
+  document.getElementById('empty').className = 'empty'
+  startProgress()
+
+  try {
+    const resp = await fetch('/momento')
+    const data = await resp.json()
+    stopProgress()
+    btn.disabled = false
+    btn.innerHTML = '<span>🕐</span> Para este momento'
+
+    if (data.error) { setError(data.error); return }
+
+    renderResults({
+      title:     data.label,
+      artist:    data.label,
+      top:       data.results.slice(0, 5),
+      secondary: [],
+      results:   data.results,
+    })
+
+    document.getElementById('results-section').scrollIntoView({behavior: 'smooth'})
+
+  } catch(e) {
+    stopProgress()
+    btn.disabled = false
+    btn.innerHTML = '<span>🕐</span> Para este momento'
+    setError('Error al detectar el momento. Intenta de nuevo.')
+  }
 }
 
 async function findGems() {
