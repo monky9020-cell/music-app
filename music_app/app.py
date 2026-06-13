@@ -829,7 +829,9 @@ def resolve():
 def momento():
     """Recomienda música según la hora del día."""
     from datetime import datetime
-    hora = datetime.now().hour
+    # Usa la hora local del usuario si viene en el request
+    hora_param = request.args.get('hora')
+    hora = int(hora_param) if hora_param and hora_param.isdigit() else datetime.now().hour
 
     MOMENTOS = {
         "nocturno":      {"rango": (0, 6),   "label": "🌑 Modo nocturno",      "seeds": ["Burial", "Massive Attack", "Portishead", "Grouper", "Tim Hecker"]},
