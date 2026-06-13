@@ -832,6 +832,12 @@ def momento():
     # Usa la hora local del usuario si viene en el request
     hora_param = request.args.get('hora')
     hora = int(hora_param) if hora_param and hora_param.isdigit() else datetime.now().hour
+    # Historial del usuario para personalizar
+    history_param = request.args.get('history', '[]')
+    try:
+        user_history = json.loads(history_param)[:5]
+    except Exception:
+        user_history = []
 
     MOMENTOS = {
         "nocturno":      {"rango": (0, 6),   "label": "🌑 Modo nocturno",      "seeds": ["Burial", "Massive Attack", "Portishead", "Grouper", "Tim Hecker"]},
@@ -860,8 +866,24 @@ def momento():
         if not tracks:
             return jsonify({"error": "No se encontró música para este momento"}), 404
 
+        # Mezcla semillas del momento con artistas del historial del usuario
+        all_seeds = list(momento_actual["seeds"])
+        
+        # Agrega artistas similares del historial
+        if user_history:
+            for hist_artist in random.sample(user_history, min(2, len(user_history))):
+                similar = query_gen.lastfm.get_similar_artists(hist_artist, limit=5)
+                for s in similar:
+                    if s.match > 0.3:
+                        all_seeds.append(s.name)
+                        break
+
+        # Mezcla y elige
+        random.shuffle(all_seeds)
+        chosen_seeds = all_seeds[:5]
+
         queries = []
-        for seed in random.sample(momento_actual["seeds"], min(4, len(momento_actual["seeds"]))):
+        for seed in chosen_seeds:
             seed_tracks = query_gen.lastfm.get_top_tracks(seed, limit=3)
             if seed_tracks:
                 queries.append((f"{seed} {random.choice(seed_tracks)} official", seed))
