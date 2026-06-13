@@ -991,16 +991,18 @@ def trending():
         year = date.today().year
         prefix = f"sonar:likes:{year}W{week:02d}:"
 
-        # Busca todas las claves de esta semana en Redis
+        # Busca todas las claves de esta semana en Redis usando SCAN
         if not REDIS_URL:
             return jsonify({"songs": []})
 
         resp = req.get(
-            f"{REDIS_URL}/keys/{prefix}*",
+            f"{REDIS_URL}/scan/0",
             headers={"Authorization": f"Bearer {REDIS_TOKEN}"},
+            params={"match": f"{prefix}*", "count": 100},
             timeout=5
         )
-        keys = resp.json().get("result", [])
+        scan_result = resp.json().get("result", [[], []])
+        keys = scan_result[1] if len(scan_result) > 1 else []
 
         songs = []
         for key in keys:
