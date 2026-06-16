@@ -263,7 +263,7 @@
   <div class="menu-title">🧬 Tu DNA Musical</div>
   <div class="dna-card" id="dna-card-menu" style="margin-bottom:0">
     <div id="dna-content-menu">
-      <div class="dna-empty">Da 👍 a canciones para ver tu perfil musical aquí.</div>
+      <div class="dna-empty">Da ♥ a canciones para ver tu perfil musical aquí.</div>
     </div>
   </div>
 
@@ -318,7 +318,7 @@
     <div class="daily-actions">
       <button class="daily-btn primary" onclick="dailySearch()">Buscar similares</button>
       <button class="daily-btn" onclick="openYT(dailySongUrl)">Abrir en YouTube</button>
-      <button class="daily-btn" id="daily-like-btn" onclick="likeDailySong()">👍 <span id="daily-like-count">0</span></button>
+      <button class="daily-btn" id="daily-like-btn" onclick="likeDailySong()" style="display:flex;align-items:center;gap:4px"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg> <span id="daily-like-count">0</span></button>
     </div>
   </div>
 
@@ -626,18 +626,26 @@ async function likeDailySong() {
 
   if (alreadyLiked) {
     localStorage.removeItem(likeKey)
+    localStorage.removeItem(likeKey + ':artist')
     btn.style.color = ''
     if (countEl) countEl.textContent = Math.max(0, currentCount - 1)
+    buildDNA()
     try {
       await fetch('/unlike', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({title: saved.title, target_artist: saved.artist, url: saved.url})
       })
+      loadTrending()
     } catch(e) {}
     return
   }
 
+  // Guarda en localStorage primero
+  localStorage.setItem(likeKey, '1')
+  localStorage.setItem(likeKey + ':artist', saved.artist || '')
+  btn.style.color = '#1db954'
+  buildDNA()
   try {
     const resp = await fetch('/like', {
       method: 'POST',
@@ -645,11 +653,8 @@ async function likeDailySong() {
       body: JSON.stringify({title: saved.title, target_artist: saved.artist, url: saved.url})
     })
     const data = await resp.json()
-    if (data.likes !== undefined) {
-      localStorage.setItem(likeKey, '1')
-      btn.style.color = '#1db954'
-      if (countEl) countEl.textContent = data.likes
-      buildDNA()
+    if (data.likes !== undefined && countEl) {
+      countEl.textContent = data.likes
       loadTrending()
     }
   } catch(e) {}
@@ -1195,7 +1200,7 @@ function buildDNA() {
   const card2 = document.getElementById('dna-content-menu')
   
   if (likedArtists.length === 0) {
-    if(card2) card2.innerHTML = '<div class="dna-empty">Da 👍 a canciones para ver tu perfil musical aquí.</div>'
+    if(card2) card2.innerHTML = '<div class="dna-empty">Da ♥ a canciones para ver tu perfil musical aquí.</div>'
     return
   }
 
@@ -1227,7 +1232,7 @@ function buildDNA() {
     <div class="dna-genres">${genres.map(g => `<span class="dna-genre">${g}</span>`).join('')}</div>
     <div class="dna-artists">${uniqueArtists.join(' · ')}</div>
     <div class="dna-phrase">"${phrase}"</div>
-    <div class="dna-stats">👍 ${likedArtists.length} canciones likeadas</div>
+    <div class="dna-stats">♥ ${likedArtists.length} canciones likeadas</div>
     <button class="dna-share" onclick="shareDNA('${phrase}', '${genres.join(', ')}')">📤 Compartir mi DNA</button>
   `
 }
