@@ -836,7 +836,12 @@ function makeCard(r, globalIdx, secondary = false) {
   }).catch(() => {})
 
   card.querySelector('.btn-like').addEventListener('click', function() {
-    handleLike(this, r)
+    const songData = {
+      title: this.dataset.title,
+      target_artist: this.dataset.artist,
+      url: this.dataset.url
+    }
+    handleLike(this, songData)
   })
   card.querySelector('.btn-share').addEventListener('click', function() {
     shareResult(this.dataset.title, this.dataset.artist)
