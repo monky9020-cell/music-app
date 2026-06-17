@@ -911,6 +911,38 @@ function makeCard(r, globalIdx, secondary = false) {
 }
 
 
+
+// ── Filtro de hits repetidos ───────────────────────────────
+function trackHitSeen(url) {
+  const key = 'hit_seen:' + url
+  const now = Date.now()
+  const TTL = 3 * 60 * 60 * 1000 // 3 horas
+  const data = JSON.parse(localStorage.getItem(key) || '{"count":0,"first":0}')
+  
+  // Si pasaron más de 3 horas, resetea
+  if (now - data.first > TTL) {
+    localStorage.setItem(key, JSON.stringify({count: 1, first: now}))
+    return 1
+  }
+  
+  data.count++
+  localStorage.setItem(key, JSON.stringify(data))
+  return data.count
+}
+
+function isHitBlocked(url) {
+  const key = 'hit_seen:' + url
+  const now = Date.now()
+  const TTL = 3 * 60 * 60 * 1000
+  const data = JSON.parse(localStorage.getItem(key) || '{"count":0,"first":0}')
+  if (now - data.first > TTL) return false
+  return data.count >= 3
+}
+
+function filterSeenHits(results) {
+  return results.filter(r => !isHitBlocked(r.url))
+}
+
 async function findMomento() {
   const btn = document.getElementById('btn-momento')
   btn.disabled = true
