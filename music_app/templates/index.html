@@ -424,6 +424,58 @@
 <div class="toast" id="toast">🔗 Link copiado</div>
 
 <script>
+// ── DNA Musical ────────────────────────────────────────────
+const ARTIST_GENRES = {
+  // Rock
+  'deftones':'Rock','tool':'Rock','nirvana':'Rock','radiohead':'Rock',
+  'arctic monkeys':'Rock','interpol':'Rock','the cure':'Rock',
+  'queens of the stone age':'Rock','muse':'Rock','placebo':'Rock',
+  'soundgarden':'Rock','alice in chains':'Rock','pearl jam':'Rock',
+  'linkin park':'Rock','system of a down':'Rock','korn':'Rock',
+  // Electronic
+  'crystal castles':'Electronic','burial':'Electronic','massive attack':'Electronic',
+  'portishead':'Electronic','four tet':'Electronic','boards of canada':'Electronic',
+  'aphex twin':'Electronic','bonobo':'Electronic','caribou':'Electronic',
+  'the xx':'Electronic','james blake':'Electronic','moderat':'Electronic',
+  // Reggaeton/Urbano
+  'bad bunny':'Reggaeton','j balvin':'Reggaeton','feid':'Reggaeton',
+  'rauw alejandro':'Reggaeton','karol g':'Reggaeton','ozuna':'Reggaeton',
+  'peso pluma':'Corridos','natanael cano':'Corridos','eslabon armado':'Corridos',
+  'mora':'Urbano Latino','sech':'Urbano Latino','jhay cortez':'Urbano Latino',
+  // Hip-Hop
+  'kendrick lamar':'Hip-Hop','tyler the creator':'Hip-Hop','frank ocean':'Hip-Hop',
+  'drake':'Hip-Hop','travis scott':'Hip-Hop','jpegmafia':'Hip-Hop',
+  // Pop
+  'the weeknd':'Pop','billie eilish':'Pop','dua lipa':'Pop',
+  'taylor swift':'Pop','ariana grande':'Pop','harry styles':'Pop',
+  // Indie
+  'phoebe bridgers':'Indie','big thief':'Indie','sufjan stevens':'Indie',
+  'beach house':'Indie','bon iver':'Indie','fleet foxes':'Indie',
+  // Ambient
+  'brian eno':'Ambient','tim hecker':'Ambient','nils frahm':'Ambient',
+}
+
+const DNA_PHRASES = {
+  single: {
+    'Rock': 'Guitarras en las venas',
+    'Electronic': 'Viajero de frecuencias',
+    'Reggaeton': 'Del bloque al mundo',
+    'Hip-Hop': 'Letras que pesan',
+    'Pop': 'Melodies first',
+    'Indie': 'Fuera del mainstream',
+    'Ambient': 'Sonidos del universo',
+    'Corridos': 'Tierra y ritmo',
+    'Urbano Latino': 'El sabor latino',
+  },
+  multi: [
+    'Sin fronteras musicales',
+    'Un oído para todo',
+    'La mezcla perfecta',
+    'Géneros sin límites',
+    'Tu propio algoritmo',
+  ]
+}
+
 // ── Estado global ──────────────────────────────────────────
 let lastResults    = []
 let searchHistory  = []
@@ -1126,58 +1178,6 @@ function toggleMenu() {
     buildDNA()
     renderMenuPlaylists()
   }
-}
-
-// ── DNA Musical ────────────────────────────────────────────
-const ARTIST_GENRES = {
-  // Rock
-  'deftones':'Rock','tool':'Rock','nirvana':'Rock','radiohead':'Rock',
-  'arctic monkeys':'Rock','interpol':'Rock','the cure':'Rock',
-  'queens of the stone age':'Rock','muse':'Rock','placebo':'Rock',
-  'soundgarden':'Rock','alice in chains':'Rock','pearl jam':'Rock',
-  'linkin park':'Rock','system of a down':'Rock','korn':'Rock',
-  // Electronic
-  'crystal castles':'Electronic','burial':'Electronic','massive attack':'Electronic',
-  'portishead':'Electronic','four tet':'Electronic','boards of canada':'Electronic',
-  'aphex twin':'Electronic','bonobo':'Electronic','caribou':'Electronic',
-  'the xx':'Electronic','james blake':'Electronic','moderat':'Electronic',
-  // Reggaeton/Urbano
-  'bad bunny':'Reggaeton','j balvin':'Reggaeton','feid':'Reggaeton',
-  'rauw alejandro':'Reggaeton','karol g':'Reggaeton','ozuna':'Reggaeton',
-  'peso pluma':'Corridos','natanael cano':'Corridos','eslabon armado':'Corridos',
-  'mora':'Urbano Latino','sech':'Urbano Latino','jhay cortez':'Urbano Latino',
-  // Hip-Hop
-  'kendrick lamar':'Hip-Hop','tyler the creator':'Hip-Hop','frank ocean':'Hip-Hop',
-  'drake':'Hip-Hop','travis scott':'Hip-Hop','jpegmafia':'Hip-Hop',
-  // Pop
-  'the weeknd':'Pop','billie eilish':'Pop','dua lipa':'Pop',
-  'taylor swift':'Pop','ariana grande':'Pop','harry styles':'Pop',
-  // Indie
-  'phoebe bridgers':'Indie','big thief':'Indie','sufjan stevens':'Indie',
-  'beach house':'Indie','bon iver':'Indie','fleet foxes':'Indie',
-  // Ambient
-  'brian eno':'Ambient','tim hecker':'Ambient','nils frahm':'Ambient',
-}
-
-const DNA_PHRASES = {
-  single: {
-    'Rock': 'Guitarras en las venas',
-    'Electronic': 'Viajero de frecuencias',
-    'Reggaeton': 'Del bloque al mundo',
-    'Hip-Hop': 'Letras que pesan',
-    'Pop': 'Melodies first',
-    'Indie': 'Fuera del mainstream',
-    'Ambient': 'Sonidos del universo',
-    'Corridos': 'Tierra y ritmo',
-    'Urbano Latino': 'El sabor latino',
-  },
-  multi: [
-    'Sin fronteras musicales',
-    'Un oído para todo',
-    'La mezcla perfecta',
-    'Géneros sin límites',
-    'Tu propio algoritmo',
-  ]
 }
 
 function buildDNA() {
